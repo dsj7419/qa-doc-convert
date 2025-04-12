@@ -1,0 +1,5 @@
+2025-04-11 21:26:59,496 - __main__ - INFO - Starting QA Verifier Professional Edition
+2025-04-11 21:27:06,799 - services.file_service - INFO - Selected file: C:/Users/LapLz1/Downloads/JWBM CivPro Quiz Complete 20250407.docx
+2025-04-11 21:27:06,801 - ui.components.log_panel - INFO - Loading file: C:/Users/LapLz1/Downloads/JWBM CivPro Quiz Complete 20250407.docx
+2025-04-11 21:27:06,854 - models.document - INFO - Extracted 163 non-empty paragraphs.
+2025-04-11 21:27:11,586 - __main__ - INFO - Application closed normally

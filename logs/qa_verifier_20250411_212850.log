@@ -1,0 +1,11 @@
+2025-04-11 21:28:50,908 - __main__ - INFO - Starting QA Verifier Professional Edition
+2025-04-11 21:28:58,048 - services.file_service - INFO - Selected file: C:/Users/LapLz1/Downloads/JWBM CivPro Quiz Complete 20250407.docx
+2025-04-11 21:28:58,050 - ui.components.log_panel - INFO - Loading file: C:/Users/LapLz1/Downloads/JWBM CivPro Quiz Complete 20250407.docx
+2025-04-11 21:28:58,105 - models.document - INFO - Extracted 163 non-empty paragraphs.
+2025-04-11 21:30:06,115 - ui.components.log_panel - INFO - Changing role to QUESTION for 1 paragraph(s).
+2025-04-11 21:30:07,432 - ui.components.log_panel - INFO - Changing role to ANSWER for 1 paragraph(s).
+2025-04-11 21:30:14,232 - ui.components.log_panel - INFO - Attempting to merge 1 paragraph(s) into previous answer.
+2025-04-11 21:30:20,747 - ui.components.log_panel - INFO - Changing role to QUESTION for 1 paragraph(s).
+2025-04-11 21:30:22,357 - ui.components.log_panel - INFO - Changing role to ANSWER for 1 paragraph(s).
+2025-04-11 21:30:24,069 - ui.components.log_panel - INFO - Changing role to QUESTION for 1 paragraph(s).
+2025-04-11 21:33:13,142 - __main__ - INFO - Application closed normally

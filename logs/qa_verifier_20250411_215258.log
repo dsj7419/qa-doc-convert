@@ -1,0 +1,7 @@
+2025-04-11 21:52:58,657 - __main__ - INFO - Starting QA Verifier Professional Edition
+2025-04-11 21:53:58,580 - services.file_service - INFO - Selected file: C:/Users/LapLz1/Downloads/JWBM CivPro Quiz Complete 20250407.docx
+2025-04-11 21:53:58,582 - ui.components.log_panel - INFO - Loading file: C:/Users/LapLz1/Downloads/JWBM CivPro Quiz Complete 20250407.docx
+2025-04-11 21:53:58,636 - models.document - INFO - Extracted 163 non-empty paragraphs.
+2025-04-11 21:55:13,040 - ui.components.log_panel - INFO - Expected question count manually set to 24
+2025-04-11 21:55:16,786 - ui.components.log_panel - INFO - Expected question count manually set to 55
+2025-04-11 22:08:03,831 - __main__ - INFO - Application closed normally
