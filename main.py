@@ -13,12 +13,16 @@ from presenters.main_presenter import MainPresenter
 from ui.main_window import MainWindow
 from utils.logging_setup import setup_logging
 from utils.theme import AppTheme
+from utils.config_manager import ConfigManager
 
 def main():
     """Main application entry point."""
     # Setup logging
     setup_logging()
     logger = logging.getLogger(__name__)
+
+    config_manager = ConfigManager()
+    config = config_manager.get_config()
     
     try:
         # Create and start the application
@@ -52,13 +56,13 @@ def main():
         
         # Initialize components with dependency injection
         # Create models
-        document = Document()
+        document = Document(config_manager)
         
         # Create views
         view = MainWindow(root)
         
         # Create presenters
-        presenter = MainPresenter(view, document, root)
+        presenter = MainPresenter(view, document, root, config_manager)
         
         # Connect presenter to view
         view.set_presenter(presenter)

@@ -1,0 +1,48 @@
+{
+    "question": [
+      {
+        "text": "There are 2 kinds of jurisdiction. What are they?",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      },
+      {
+        "text": "What is the type of jurisdiction that relates only to federal courts?",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      },
+      {
+        "text": "Name 2 grounds that give rise to federal court jurisdiction.",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      }
+    ],
+    "answer": [
+      {
+        "text": "1. Personal",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      },
+      {
+        "text": "2. Subject matter",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      },
+      {
+        "text": "Subject matter jurisdiction relates only to federal courts. State courts are courts of general jurisdiction. There are no subject matter limitations to state court jurisdiction.",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      }
+    ],
+    "ignore": [
+      {
+        "text": "JW Bar Method CA Bar Essay Quizzes",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      },
+      {
+        "text": "CIVIL PROCEDURE (50 questions)",
+        "source": "document",
+        "timestamp": "2025-04-12T12:00:00.000000"
+      }
+    ]
+  }

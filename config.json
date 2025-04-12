@@ -1,0 +1,11 @@
+{
+    "analysis": {
+        "analyzer_type": "auto"
+    },
+    "ui": {
+        "theme": "default"
+    },
+    "export": {
+        "default_format": "csv"
+    }
+}

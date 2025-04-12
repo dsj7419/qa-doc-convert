@@ -1,2 +1,7 @@
 python-docx>=0.8.11
 pytest>=7.0.0
+numpy>=1.20.0
+scikit-learn>=1.0.0
+joblib>=1.0.0
+pandas>=2.2.3
+appdirs>=1.4.4

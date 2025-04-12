@@ -74,6 +74,35 @@ class MainWindow(IMainWindowView, IParagraphListView):
         )
         self.header.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
+        # Add debug menu
+        self.menu_bar = tk.Menu(self.root)
+        self.root.config(menu=self.menu_bar)
+
+        # File menu
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label="Load DOCX", command=self._on_load_click)
+        file_menu.add_command(label="Save CSV", command=self._on_save_click)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self._on_exit)
+
+        # Debug menu
+        debug_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Debug", menu=debug_menu)
+        debug_menu.add_command(label="Toggle Manual Training Mode", 
+                       command=self._toggle_manual_training_mode)
+        debug_menu.add_command(label="Show Training Progress", command=self._show_training_progress)
+        debug_menu.add_command(label="Show AI Training Stats", command=self._show_ai_stats)
+        debug_menu.add_command(label="View Training Examples", command=self._view_training_examples)
+        debug_menu.add_command(label="Save Training Data Now", command=self._save_training_data)
+        debug_menu.add_command(label="Collect Examples from Document", command=self._collect_examples_now)
+        debug_menu.add_command(label="Force AI Training", command=self._force_ai_training)
+        debug_menu.add_command(label="Diagnose and Fix AI Training", command=self._diagnose_ai_training)
+        debug_menu.add_command(label="Reset & Use AI Analyzer", command=self._reset_and_use_ai)
+        debug_menu.add_command(label="Reset All Training Data", command=self._reset_training_data)
+        debug_menu.add_command(label="Verify File Permissions", command=self._verify_file_permissions)
+        debug_menu.add_command(label="Open Data Directory", command=self._open_data_dir)
+
         # Status Bar - reduced height
         self.status_bar = StatusBar(self.root)
         self.status_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 0))
@@ -116,6 +145,69 @@ class MainWindow(IMainWindowView, IParagraphListView):
         self.log_panel.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 5))
     
     # IMainWindowView implementation
+    def _toggle_manual_training_mode(self):
+        """Toggle manual training mode."""
+        if self.presenter:
+            self.presenter.toggle_manual_training_mode_requested()
+
+    def _show_ai_stats(self):
+        """Show AI training statistics."""
+        if self.presenter:
+            self.presenter.show_ai_stats_requested()
+
+    def _show_training_progress(self):
+        """Show training progress."""
+        if self.presenter:
+            self.presenter.show_training_progress()
+
+    def _view_training_examples(self):
+        """View some training examples."""
+        if self.presenter:
+            self.presenter.view_training_examples_requested()
+
+    def _collect_examples_now(self):
+        """Collect training examples from the current document."""
+        if self.presenter:
+            self.presenter.collect_examples_now_requested()
+                    
+    def _force_ai_training(self):
+        """Force AI model training."""
+        if self.presenter:
+            self.presenter.force_ai_training_requested()
+
+    def _save_training_data(self):
+        """Save training data immediately."""
+        if self.presenter:
+            self.presenter.save_training_data_requested()
+
+    def _diagnose_ai_training(self):
+        """Diagnose and fix AI training issues."""
+        if self.presenter:
+            self.presenter.diagnose_ai_training_requested()
+
+    def _reset_and_use_ai(self):
+        """Reset and force use of AI analyzer."""
+        if self.presenter:
+            self.presenter.reset_and_use_ai_requested()
+
+    def _reset_training_data(self):
+        """Reset all training data."""
+        if self.presenter:
+            if messagebox.askyesno("Confirm Reset", 
+                                "This will delete ALL training data and reset the AI.\n\n"
+                                "Are you sure you want to proceed?"):
+                self.presenter.reset_all_training_data_requested()
+
+    def _verify_file_permissions(self):
+        """Verify file permissions for training data."""
+        if self.presenter:
+            self.presenter.verify_file_permissions_requested()
+
+    def _open_data_dir(self):
+        """Open the data directory in file explorer."""
+        if self.presenter:
+            self.presenter.open_data_dir_requested()
+
     def display_paragraphs(self, paragraphs: List[Paragraph]) -> None:
         """
         Display paragraphs in the UI.

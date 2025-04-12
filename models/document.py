@@ -8,18 +8,25 @@ from typing import List, Dict, Optional, Set, Tuple, Any, Callable
 from models.paragraph import Paragraph, ParaRole
 from services.analysis_service import AnalysisService
 from services.file_service import FileService
+from utils.config_manager import ConfigManager
 
 logger = logging.getLogger(__name__)
 
 class Document:
     """Represents a document with paragraphs for Q&A analysis."""
     
-    def __init__(self):
-        """Initialize an empty document."""
+    def __init__(self, config_manager: Optional[ConfigManager] = None):
+        """
+        Initialize an empty document.
+        
+        Args:
+            config_manager: Configuration manager
+        """
         self.file_path: Optional[str] = None
         self.paragraphs: List[Paragraph] = []
         self.expected_question_count: int = 0
         self._current_q_num: int = 0
+        self.config_manager = config_manager or ConfigManager()
         
     def load_file(self, file_path: str, status_callback: Callable[[str], None]) -> bool:
         """
@@ -43,8 +50,12 @@ class Document:
                 logger.error("Document contains no readable text.")
                 return False
                 
-            # Use AnalysisService to analyze paragraphs
-            question_indices, est_count = AnalysisService.analyze_paragraphs(raw_paragraphs, status_callback)
+            # Create analysis service with config
+            analysis_config = self.config_manager.get_config('analysis')
+            analysis_service = AnalysisService(analysis_config)
+            
+            # Analyze paragraphs
+            question_indices, est_count = analysis_service.analyze_paragraphs(raw_paragraphs, status_callback)
             
             # Set expected count
             self.expected_question_count = est_count
