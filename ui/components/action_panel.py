@@ -10,7 +10,8 @@ class ActionPanel(ttk.Frame):
     """Panel containing action buttons and controls."""
     
     def __init__(self, parent, on_mark_question=None, on_mark_answer=None, 
-                 on_mark_ignore=None, on_merge_up=None, on_set_expected_count=None):
+                 on_mark_ignore=None, on_merge_up=None, on_set_expected_count=None,
+                 on_exit=None):
         """
         Initialize the action panel.
         
@@ -21,6 +22,7 @@ class ActionPanel(ttk.Frame):
             on_mark_ignore: Callback for marking as ignore
             on_merge_up: Callback for merging into previous answer
             on_set_expected_count: Callback for setting expected count
+            on_exit: Callback for exit button
         """
         super().__init__(parent, style='TFrame')
         
@@ -29,6 +31,7 @@ class ActionPanel(ttk.Frame):
         self.on_mark_ignore = on_mark_ignore
         self.on_merge_up = on_merge_up
         self.on_set_expected_count = on_set_expected_count
+        self.on_exit = on_exit
         
         self._init_ui()
     
@@ -361,4 +364,5 @@ class ActionPanel(ttk.Frame):
     
     def _on_exit(self):
         """Handle exit button click."""
-        self.master.master.master.quit()
+        if callable(self.on_exit):
+            self.on_exit()

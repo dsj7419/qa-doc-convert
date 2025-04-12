@@ -1,24 +1,24 @@
 """
-Main application window.
+Main application window implementing the MVP pattern view interfaces.
 """
 import logging
 import tkinter as tk
 from tkinter import messagebox, ttk
+from typing import Callable, List, Optional, Set
 
-from models.document import Document
-from models.paragraph import ParaRole
-from services.file_service import FileService
+from models.paragraph import Paragraph, ParaRole
 from ui.components.action_panel import ActionPanel
 from ui.components.header_panel import HeaderPanel
 from ui.components.log_panel import LogPanel
 from ui.components.paragraph_list import ParagraphList
 from ui.components.status_bar import StatusBar
+from ui.interfaces import IMainWindowView, IParagraphListView
 from utils.theme import AppTheme
 
 logger = logging.getLogger(__name__)
 
-class MainWindow:
-    """Main application window."""
+class MainWindow(IMainWindowView, IParagraphListView):
+    """Main application window implementing the MVP view interfaces."""
     
     def __init__(self, root):
         """
@@ -36,14 +36,23 @@ class MainWindow:
         self.root.configure(bg=AppTheme.COLORS['bg'])
         AppTheme.configure(self.root)
         
-        # Initialize document model
-        self.document = Document()
+        # Presenter reference - will be set by main.py
+        self.presenter = None
         
         # Build UI
         self._build_ui()
+    
+    def set_presenter(self, presenter):
+        """
+        Set the presenter for this view.
         
-        # Initialize components
-        self._init_bindings()
+        Args:
+            presenter: The presenter to use
+        """
+        self.presenter = presenter
+        
+        # Set up the paragraph list selection callback
+        self.para_list.set_selection_callback(self._on_paragraph_selected)
     
     def _build_ui(self):
         """Build the main UI structure."""
@@ -60,8 +69,8 @@ class MainWindow:
         # Create a gradient frame for the header
         self.header = HeaderPanel(
             self.root,
-            on_load=self.load_file,
-            on_save=self.save_csv
+            on_load=self._on_load_click,
+            on_save=self._on_save_click
         )
         self.header.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
@@ -93,11 +102,12 @@ class MainWindow:
         
         self.action_panel = ActionPanel(
             action_frame,
-            on_mark_question=lambda: self.change_role(ParaRole.QUESTION),
-            on_mark_answer=lambda: self.change_role(ParaRole.ANSWER),
-            on_mark_ignore=lambda: self.change_role(ParaRole.IGNORE),
-            on_merge_up=self.merge_up,
-            on_set_expected_count=self.set_expected_count
+            on_mark_question=lambda: self._on_change_role(ParaRole.QUESTION),
+            on_mark_answer=lambda: self._on_change_role(ParaRole.ANSWER),
+            on_mark_ignore=lambda: self._on_change_role(ParaRole.IGNORE),
+            on_merge_up=self._on_merge_up,
+            on_set_expected_count=self._on_set_expected_count,
+            on_exit=self._on_exit
         )
         self.action_panel.pack(fill=tk.BOTH, expand=True)
         
@@ -105,215 +115,203 @@ class MainWindow:
         self.log_panel = LogPanel(self.root)
         self.log_panel.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 5))
     
-    def _init_bindings(self):
-        """Initialize event bindings."""
-        # Bind paragraph selection event
-        self.para_list.set_selection_callback(self.on_paragraph_selected)
+    # IMainWindowView implementation
+    def display_paragraphs(self, paragraphs: List[Paragraph]) -> None:
+        """
+        Display paragraphs in the UI.
         
-        # Set the status update callback
-        self.status_callback = self.status_bar.update_status
-        
-        # Set the log callback
-        self.log_callback = self.log_panel.log_message
+        Args:
+            paragraphs: List of paragraphs to display
+        """
+        self.para_list.set_paragraphs(paragraphs)
     
-    def on_paragraph_selected(self):
-        """Handle paragraph selection events."""
-        # Update action panel state based on selection
-        self.action_panel.update_selection_state(bool(self.para_list.get_selected_indices()))
+    def show_status(self, message: str) -> None:
+        """
+        Show a status message.
+        
+        Args:
+            message: Status message to display
+        """
+        self.status_bar.update_status(message)
     
-    def load_file(self):
-        """Load a DOCX file for processing."""
-        # Clear existing data first
-        self.reset_ui()
+    def show_error(self, title: str, message: str) -> None:
+        """
+        Show an error message.
         
-        # Get file path from dialog
-        file_path = FileService.select_docx_file()
-        if not file_path:
-            return
+        Args:
+            title: Error title
+            message: Error message
+        """
+        messagebox.showerror(title, message)
+    
+    def show_info(self, title: str, message: str) -> None:
+        """
+        Show an info message.
         
-        # Update status
-        self.status_callback(f"Loading: {os.path.basename(file_path)}...")
-        self.log_callback(f"Loading file: {file_path}")
+        Args:
+            title: Info title
+            message: Info message
+        """
+        messagebox.showinfo(title, message)
+    
+    def show_warning(self, title: str, message: str) -> None:
+        """
+        Show a warning message.
         
-        # Load and process document
-        if self.document.load_file(file_path, self.status_callback):
-            # Update UI with paragraphs
-            self.para_list.set_paragraphs(self.document.paragraphs)
+        Args:
+            title: Warning title
+            message: Warning message
+        """
+        messagebox.showwarning(title, message)
+    
+    def ask_yes_no(self, title: str, message: str) -> bool:
+        """
+        Ask a yes/no question.
+        
+        Args:
+            title: Question title
+            message: Question message
             
-            # Update expected count in action panel
-            self.action_panel.set_expected_count(self.document.expected_question_count)
-            
-            # Update stats display
-            self.update_stats()
-            
-            # Ready status
-            self.status_callback("Ready for verification. Select a paragraph.")
-        else:
-            messagebox.showerror("Error", "Failed to load or process the document.")
-            self.status_callback("Error loading document.")
+        Returns:
+            bool: True for yes, False for no
+        """
+        return messagebox.askyesno(title, message)
     
-    def reset_ui(self):
-        """Reset UI state for new document."""
-        self.document = Document()
-        self.para_list.clear()
-        self.action_panel.reset()
-        self.status_callback("Load a DOCX file to begin.")
-    
-    def update_stats(self):
-        """Update statistics display."""
-        question_count = self.document.get_question_count()
-        expected_count = self.document.expected_question_count
+    def ask_yes_no_cancel(self, title: str, message: str) -> Optional[bool]:
+        """
+        Ask a yes/no/cancel question.
         
-        # Update progress in action panel
+        Args:
+            title: Question title
+            message: Question message
+            
+        Returns:
+            Optional[bool]: True for yes, False for no, None for cancel
+        """
+        return messagebox.askyesnocancel(title, message, icon=messagebox.WARNING)
+    
+    def log_message(self, message: str, level: str = "INFO") -> None:
+        """
+        Log a message.
+        
+        Args:
+            message: Message to log
+            level: Log level
+        """
+        self.log_panel.log_message(message, level)
+    
+    def update_progress(self, question_count: int, expected_count: int) -> None:
+        """
+        Update the progress display.
+        
+        Args:
+            question_count: Current question count
+            expected_count: Expected question count
+        """
         self.action_panel.update_progress(question_count, expected_count)
     
-    def set_expected_count(self):
-        """Set the expected question count from user input."""
-        try:
-            new_count = int(self.action_panel.get_expected_count())
-            if new_count <= 0:
-                messagebox.showwarning("Invalid Count", "Please enter a positive number of questions.")
-                return
-                
-            self.document.set_expected_question_count(new_count)
-            self.log_callback(f"Expected question count manually set to {new_count}")
-            self.update_stats()
-        except ValueError:
-            messagebox.showwarning("Invalid Input", "Please enter a valid number.")
-    
-    def change_role(self, new_role):
+    def set_expected_count(self, count: int) -> None:
         """
-        Change the role of selected paragraphs.
+        Set the expected question count in the UI.
+        
+        Args:
+            count: Expected question count
+        """
+        self.action_panel.set_expected_count(count)
+    
+    def get_expected_count(self) -> str:
+        """
+        Get the expected question count from the UI.
+        
+        Returns:
+            str: Expected question count as string
+        """
+        return self.action_panel.get_expected_count()
+    
+    def enable_editing_actions(self, enabled: bool) -> None:
+        """
+        Enable or disable editing actions.
+        
+        Args:
+            enabled: Whether actions should be enabled
+        """
+        self.action_panel.update_selection_state(enabled)
+    
+    def reset_ui(self) -> None:
+        """Reset the UI state."""
+        self.para_list.clear()
+        self.action_panel.reset()
+        self.show_status("Load a DOCX file to begin.")
+    
+    # IParagraphListView implementation (delegated to para_list)
+    def set_paragraphs(self, paragraphs: List[Paragraph]) -> None:
+        """
+        Set the paragraphs to display.
+        
+        Args:
+            paragraphs: List of paragraphs to display
+        """
+        self.para_list.set_paragraphs(paragraphs)
+    
+    def get_selected_indices(self) -> Set[int]:
+        """
+        Get the indices of selected paragraphs.
+        
+        Returns:
+            Set of selected indices
+        """
+        return self.para_list.get_selected_indices()
+    
+    def set_selection_callback(self, callback: Callable[[], None]) -> None:
+        """
+        Set the callback for selection changes.
+        
+        Args:
+            callback: Callback function
+        """
+        self.para_list.set_selection_callback(callback)
+    
+    def clear(self) -> None:
+        """Clear the list and reset state."""
+        self.para_list.clear()
+    
+    # Event handlers that delegate to the presenter
+    def _on_paragraph_selected(self) -> None:
+        """Handle paragraph selection events."""
+        if self.presenter:
+            self.presenter.paragraph_selection_changed()
+    
+    def _on_load_click(self) -> None:
+        """Handle load button click."""
+        if self.presenter:
+            self.presenter.load_file_requested()
+    
+    def _on_save_click(self) -> None:
+        """Handle save button click."""
+        if self.presenter:
+            self.presenter.save_file_requested()
+    
+    def _on_change_role(self, new_role: ParaRole) -> None:
+        """
+        Handle role change button clicks.
         
         Args:
             new_role: New role to assign
         """
-        selected_indices = self.para_list.get_selected_indices()
-        if not selected_indices:
-            messagebox.showwarning("No Selection", "Please select one or more paragraphs to change their role.")
-            return
-        
-        self.log_callback(f"Changing role to {new_role.name} for {len(selected_indices)} paragraph(s).")
-        
-        needs_renumber = False
-        for idx in selected_indices:
-            if self.document.change_paragraph_role(idx, new_role):
-                needs_renumber = True
-        
-        if needs_renumber:
-            self.document.renumber_questions()
-            
-        # Refresh UI
-        self.para_list.set_paragraphs(self.document.paragraphs)
-        self.update_stats()
+        if self.presenter:
+            self.presenter.change_role_requested(new_role)
     
-    def multi_change_role(self, new_role):
-        """
-        Change role for multiple selected paragraphs.
-        
-        Args:
-            new_role: New role to assign
-        """
-        # This is essentially the same as change_role, but we keep it
-        # separate in case we want to add specific multi-selection behavior
-        self.change_role(new_role)
+    def _on_merge_up(self) -> None:
+        """Handle merge up button click."""
+        if self.presenter:
+            self.presenter.merge_up_requested()
     
-    def merge_up(self):
-        """Merge selected paragraphs into the previous answer block."""
-        selected_indices = self.para_list.get_selected_indices()
-        if not selected_indices:
-            messagebox.showwarning(
-                "No Selection", 
-                "Please select paragraph(s) to merge into the preceding answer block."
-            )
-            return
-        
-        self.log_callback(f"Attempting to merge {len(selected_indices)} paragraph(s) into previous answer.")
-        
-        needs_renumber = False
-        merged_count = 0
-        
-        # Process in order (sort indices)
-        for idx in sorted(selected_indices):
-            if idx == 0:
-                self.log_callback(f"Cannot merge up paragraph at index 0.", level="WARNING")
-                continue  # Cannot merge the very first paragraph
-            
-            if self.document.merge_paragraph_up(idx):
-                needs_renumber = True
-                merged_count += 1
-        
-        if merged_count == 0:
-            messagebox.showinfo("Merge", "No paragraphs could be merged. Please ensure the selected paragraphs have a preceding question or answer.")
-        elif needs_renumber:
-            self.document.renumber_questions()
-        
-        # Refresh UI
-        self.para_list.set_paragraphs(self.document.paragraphs)
-        self.update_stats()
+    def _on_set_expected_count(self) -> None:
+        """Handle set expected count button click."""
+        if self.presenter:
+            self.presenter.set_expected_count_requested()
     
-    def save_csv(self):
-        """Save the verified Q&A pairs to a CSV file."""
-        if not self.document.file_path:
-            messagebox.showerror("Error", "No file loaded.")
-            return
-        
-        if not self.document.paragraphs:
-            messagebox.showerror("Error", "No paragraph data available.")
-            return
-        
-        self.log_callback("Preparing to save CSV...")
-        
-        # Get Q&A data for validation
-        _, q_count = self.document.get_qa_data()
-        
-        # Validate question count
-        if q_count != self.document.expected_question_count:
-            message = (
-                f"You have {q_count} questions marked, but expected {self.document.expected_question_count}.\n\n"
-                f"Would you like to:\n"
-                f"- Save with the current {q_count} questions\n"
-                f"- Update the expected count to {q_count} and continue editing\n"
-                f"- Cancel and continue editing"
-            )
-            
-            response = messagebox.askyesnocancel(
-                "Question Count Mismatch", 
-                message,
-                icon=messagebox.WARNING
-            )
-            
-            if response is None:  # Cancel - continue editing
-                self.log_callback(f"Save cancelled. Continuing to edit.", level="INFO")
-                return
-            elif response is False:  # No - update expected count
-                self.document.set_expected_question_count(q_count)
-                self.action_panel.set_expected_count(q_count)
-                self.update_stats()
-                self.log_callback(f"Expected question count updated to {q_count}. Continuing to edit.", level="INFO")
-                return
-            # Yes - continue with saving
-        
-        # Get save path
-        save_path = FileService.get_save_csv_path(self.document.file_path)
-        if not save_path:
-            return
-        
-        # Save file
-        if self.document.save_to_csv(save_path):
-            self.log_callback(f"Successfully saved verified data to: {save_path}")
-            messagebox.showinfo("Save Successful", f"Verified Q&A data saved to:\n{save_path}")
-            
-            # Ask to open file
-            if messagebox.askyesno("Open File?", f"CSV saved successfully.\n\nWould you like to open the file?"):
-                success, error = FileService.open_file_externally(save_path)
-                if not success:
-                    messagebox.showwarning(
-                        "Open File Error",
-                        f"Could not automatically open the file.\nPlease navigate to it manually:\n{save_path}\n\nError: {error}"
-                    )
-        else:
-            messagebox.showerror("Save Error", "Failed to save the CSV file.")
-
-# Import statement at the end to avoid circular imports
-import os  # For file operations in load_file
+    def _on_exit(self) -> None:
+        """Handle exit button click."""
+        if self.presenter:
+            self.presenter.exit_requested()

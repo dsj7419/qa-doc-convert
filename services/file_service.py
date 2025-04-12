@@ -1,12 +1,15 @@
 """
 File service for handling file operations.
 """
+import csv
 import logging
 import os
 import platform
 import subprocess
 from tkinter import filedialog
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any
+
+import docx
 
 logger = logging.getLogger(__name__)
 
@@ -89,3 +92,51 @@ class FileService:
             error_msg = f"Could not open file: {str(e)}"
             logger.error(error_msg)
             return False, error_msg
+            
+    @staticmethod
+    def load_docx_paragraphs(file_path: str) -> List[str]:
+        """
+        Load paragraphs from a DOCX file.
+        
+        Args:
+            file_path: Path to the DOCX file
+            
+        Returns:
+            List of paragraph texts
+        """
+        try:
+            # Load document
+            doc = docx.Document(file_path)
+            raw_paragraphs = [p.text.strip() for p in doc.paragraphs if p.text and not p.text.isspace()]
+            logger.info(f"Extracted {len(raw_paragraphs)} non-empty paragraphs from: {file_path}")
+            
+            return raw_paragraphs
+            
+        except Exception as e:
+            logger.error(f"Error loading DOCX file: {e}", exc_info=True)
+            raise
+    
+    @staticmethod
+    def save_data_to_csv(data: List[List[str]], save_path: str) -> bool:
+        """
+        Save data to a CSV file.
+        
+        Args:
+            data: List of data rows
+            save_path: Path to save the CSV file
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            with open(save_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                for row in data:
+                    writer.writerow(row)
+            
+            logger.info(f"Successfully saved data to: {save_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to write CSV file: {e}", exc_info=True)
+            return False

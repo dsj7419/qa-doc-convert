@@ -38,3 +38,6 @@ Thumbs.db
 
 #logs
 *.log
+
+#docs
+Technical Refactoring.docx

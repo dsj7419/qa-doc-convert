@@ -8,6 +8,8 @@ import os
 import sys
 import tkinter as tk
 
+from models.document import Document
+from presenters.main_presenter import MainPresenter
 from ui.main_window import MainWindow
 from utils.logging_setup import setup_logging
 from utils.theme import AppTheme
@@ -48,8 +50,21 @@ def main():
         center_y = int((screen_height - window_height) / 2)
         root.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
         
-        # Initialize the application
-        app = MainWindow(root)
+        # Initialize components with dependency injection
+        # Create models
+        document = Document()
+        
+        # Create views
+        view = MainWindow(root)
+        
+        # Create presenters
+        presenter = MainPresenter(view, document, root)
+        
+        # Connect presenter to view
+        view.set_presenter(presenter)
+        
+        # Initialize the presenter
+        presenter.initialize()
         
         # Start the application
         root.mainloop()
