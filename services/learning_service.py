@@ -16,6 +16,7 @@ from typing import Callable, List, Dict, Any, Optional, Tuple
 
 from models.paragraph import Paragraph, ParaRole
 from transformers.trainer_callback import TrainerCallback
+from transformers import TrainerState, TrainerControl
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,9 @@ class LearningService:
     
     # Define the transformer model to use
     MODEL_NAME = "distilbert-base-uncased"
+    
+    # Special return value to indicate graceful stop
+    GRACEFUL_STOP = "GRACEFUL_STOP"
     
     def __init__(self):
         """Initialize the learning service."""
@@ -460,7 +464,9 @@ class LearningService:
                 with open(self.training_journal_path, 'r') as f:
                     journal = json.load(f)
                 
-                if journal.get('status') == 'in_progress':
+                self._log_debug(f"Found training journal: {journal}")
+                
+                if journal.get('status') in ['in_progress', 'interrupted']:
                     self._log_debug(f"Found incomplete training session in journal: {journal}")
                     
                     # If it's been less than 24 hours, we might want to recover
@@ -468,14 +474,42 @@ class LearningService:
                     now = datetime.now()
                     hours_since_update = (now - last_update).total_seconds() / 3600
                     
-                    if hours_since_update < 24:
-                        self._log_debug(f"Training session is recent ({hours_since_update:.1f} hours old), will attempt recovery")
-                        # Set flag to attempt recovery on next training request
-                        self.recovery_needed = True
-                        self.recovery_checkpoint = journal.get('last_checkpoint')
-                        return
+                    # Check if we have a valid checkpoint path
+                    checkpoint_path = journal.get('last_checkpoint')
+                    
+                    if hours_since_update < 24 and checkpoint_path:
+                        # Verify checkpoint exists
+                        if os.path.isdir(checkpoint_path):
+                            self._log_debug(f"Valid checkpoint found at {checkpoint_path}, will attempt recovery")
+                            # Set flag to attempt recovery on next training request
+                            self.recovery_needed = True
+                            self.recovery_checkpoint = checkpoint_path
+                            
+                            # Auto-resume training if data hasn't changed significantly
+                            if TRANSFORMERS_AVAILABLE and self.has_enough_data_to_train():
+                                self._log_debug("Auto-resuming training from checkpoint")
+                                # Start training in background - will use recovery checkpoint
+                                self.train_model(force=True, background=True)
+                            return
+                        else:
+                            self._log_debug(f"Checkpoint directory doesn't exist: {checkpoint_path}")
+                            
+                            # Try to find the latest checkpoint as fallback
+                            latest_checkpoint = self._find_latest_checkpoint(self.checkpoint_dir)
+                            if latest_checkpoint:
+                                self._log_debug(f"Found latest checkpoint as fallback: {latest_checkpoint}")
+                                self.recovery_needed = True
+                                self.recovery_checkpoint = latest_checkpoint
+                                
+                                # Auto-resume with fallback checkpoint
+                                if TRANSFORMERS_AVAILABLE and self.has_enough_data_to_train():
+                                    self._log_debug("Auto-resuming training from fallback checkpoint")
+                                    self.train_model(force=True, background=True)
+                                return
+                    else:
+                        self._log_debug(f"Training session is too old or has no checkpoint")
                 
-                # If we got here, either status isn't in_progress or it's too old
+                # If we got here, either status isn't recoverable or it's too old
                 self._log_debug("Cleaning up old training journal")
                 self._clear_training_journal()
                 self.recovery_needed = False
@@ -485,7 +519,36 @@ class LearningService:
                 self._clear_training_journal()
                 self.recovery_needed = False
         else:
+            self._log_debug("No training journal found")
             self.recovery_needed = False
+    
+    def _find_latest_checkpoint(self, output_dir):
+        """
+        Helper to find the latest checkpoint directory.
+        Returns the full path to the latest checkpoint directory or None if no checkpoints exist.
+        """
+        latest_checkpoint = None
+        latest_step = -1
+        
+        if os.path.isdir(output_dir):
+            checkpoints = [d for d in os.listdir(output_dir) if d.startswith("checkpoint-")]
+            if checkpoints:
+                # Sort by step number
+                for checkpoint in checkpoints:
+                    try:
+                        step = int(checkpoint.split('-')[-1])
+                        if step > latest_step:
+                            latest_step = step
+                            latest_checkpoint = os.path.join(output_dir, checkpoint)
+                    except ValueError:
+                        continue
+        
+        if latest_checkpoint:
+            self._log_debug(f"Found latest checkpoint: {latest_checkpoint} (step {latest_step})")
+        else:
+            self._log_debug(f"No checkpoints found in {output_dir}")
+            
+        return latest_checkpoint
 
     def _clear_training_journal(self):
         """Clear the training journal file."""
@@ -507,6 +570,19 @@ class LearningService:
             batch: Current batch number
         """
         try:
+            # Don't clear the checkpoint path if status is 'interrupted' and no checkpoint is provided
+            if status == 'interrupted' and checkpoint is None:
+                # Read the current journal to get the existing checkpoint
+                if os.path.exists(self.training_journal_path):
+                    try:
+                        with open(self.training_journal_path, 'r') as f:
+                            current_journal = json.load(f)
+                            if current_journal.get('last_checkpoint'):
+                                checkpoint = current_journal.get('last_checkpoint')
+                                self._log_debug(f"Preserving existing checkpoint path during interruption: {checkpoint}")
+                    except Exception as e:
+                        self._log_debug(f"Error reading current journal during interruption: {e}")
+            
             journal = {
                 'status': status,
                 'last_update': datetime.now().isoformat(),
@@ -611,6 +687,21 @@ class LearningService:
         self.training_should_stop = False
         self.training_completed.clear()
         
+        # Check for recovery - log more verbosely when forcing training
+        if self.recovery_needed and hasattr(self, 'recovery_checkpoint'):
+            if os.path.isdir(self.recovery_checkpoint):
+                self._log_debug(f"Recovery checkpoint found at: {self.recovery_checkpoint}")
+                if callback:
+                    callback(f"Will resume training from checkpoint", "INFO")
+                logger.info(f"Will resume training from checkpoint: {self.recovery_checkpoint}")
+            else:
+                self._log_debug(f"Recovery checkpoint not found: {self.recovery_checkpoint}")
+                if callback:
+                    callback("Recovery checkpoint not found, starting fresh training", "WARNING")
+                # Reset recovery if checkpoint not found
+                self.recovery_needed = False
+                self.recovery_checkpoint = None
+        
         # If running in background
         if background:
             self._log_debug(f"Starting training in background thread")
@@ -619,7 +710,12 @@ class LearningService:
             self.training_progress = {"status": "starting", "message": "Starting training process"}
             
             # Update journal to indicate we're starting
-            self._update_training_journal("starting")
+            status = "in_progress"
+            if self.recovery_needed and hasattr(self, 'recovery_checkpoint'):
+                # If we're resuming, make sure to keep the checkpoint path in the journal
+                self._update_training_journal(status, self.recovery_checkpoint)
+            else:
+                self._update_training_journal(status)
             
             # Create and start training thread - note the daemon=False setting
             self.training_thread = threading.Thread(
@@ -630,7 +726,10 @@ class LearningService:
             self.training_thread.start()
             
             if callback:
-                callback("Training started in background", "INFO")
+                if self.recovery_needed and hasattr(self, 'recovery_checkpoint'):
+                    callback(f"Resuming training from checkpoint", "INFO")
+                else:
+                    callback("Training started in background", "INFO")
             return True
         else:
             # Run training synchronously
@@ -645,14 +744,23 @@ class LearningService:
             force: Force training even if data hasn't changed
         """
         try:
-            success = self._train_model_internal(force)
-            if success:
+            result = self._train_model_internal(force)
+            
+            # Check if this was a graceful stop (rather than a true failure)
+            if result == self.GRACEFUL_STOP:
+                self._log_debug("Training thread detected graceful stop")
+                # Don't update journal here - it was already updated by the StoppableCheckpointCallback
+                self.training_progress = {"status": "interrupted", "message": "Training interrupted"}
+                if self.training_callback:
+                    self.training_callback("Training was interrupted", "INFO")
+            elif result:
                 self.training_progress = {"status": "completed", "message": "Training completed successfully"}
                 self._update_training_journal("completed")
                 if self.training_callback:
                     self.training_callback("Training completed successfully", "INFO")
             else:
                 self.training_progress = {"status": "failed", "message": "Training failed"}
+                # Don't update the journal here if this was a graceful stop
                 self._update_training_journal("failed")
                 if self.training_callback:
                     self.training_callback("Training failed", "ERROR")
@@ -669,206 +777,382 @@ class LearningService:
             # Signal that training is complete
             self.training_completed.set()
 
+    def _modify_checkpoint_state(self, checkpoint_path):
+        """
+        Modify the trainer_state.json in a checkpoint to force continued training.
+        
+        Args:
+            checkpoint_path: Path to the checkpoint directory
+            
+        Returns:
+            bool: True if successfully modified, False otherwise
+        """
+        try:
+            state_path = os.path.join(checkpoint_path, "trainer_state.json")
+            if os.path.exists(state_path):
+                # Read the current state
+                with open(state_path, 'r') as f:
+                    state = json.load(f)
+                
+                self._log_debug(f"Original trainer state: {state}")
+                
+                # Modify the epoch/steps to continue training
+                if 'epoch' in state:
+                    # Reduce epoch to make sure training continues
+                    # Set to 1.0 to ensure we get enough additional training
+                    original_epoch = state['epoch']
+                    state['epoch'] = min(1.0, original_epoch)
+                    self._log_debug(f"Modified epoch from {original_epoch} to {state['epoch']}")
+                
+                # Make a backup of the original state
+                backup_path = f"{state_path}.bak"
+                with open(backup_path, 'w') as f:
+                    json.dump(state, f, indent=2)
+                
+                # Write the modified state
+                with open(state_path, 'w') as f:
+                    json.dump(state, f, indent=2)
+                
+                self._log_debug(f"Successfully modified checkpoint state to force continued training")
+                return True
+            else:
+                self._log_debug(f"trainer_state.json not found in checkpoint {checkpoint_path}")
+                return False
+        except Exception as e:
+            self._log_debug(f"Error modifying checkpoint state: {e}")
+            return False
+
     def _train_model_internal(self, force: bool) -> bool:
         """
         Internal implementation of model training.
-        
+
         Args:
             force: Force training even if data hasn't changed
-            
+
         Returns:
-            bool: Success flag
+            bool: Success flag or self.GRACEFUL_STOP for graceful interruptions
         """
         self._log_debug(f"Training transformer model from collected data at {datetime.now()}...")
         logger.info("Training transformer model from collected data...")
-        
+
         try:
             # Update training progress
             self.training_progress = {"status": "preparing", "message": "Preparing training data"}
             self._update_training_journal("in_progress", epoch=0, batch=0)
             if self.training_callback:
                 self.training_callback("Preparing training data", "INFO")
-                
+
             # Prepare training data
             texts = []
             labels = []
-            
+
             for role, examples in self.training_data.items():
                 for example in examples:
                     texts.append(example['text'])
                     labels.append(role)
-            
+
             self._log_debug(f"Prepared {len(texts)} examples for training")
-            
+
             # Check for stop request
             if self.training_should_stop:
                 self._log_debug("Training stopped by request during data preparation")
-                return False
-            
+                return self.GRACEFUL_STOP
+
             # Update progress
             self.training_progress = {"status": "tokenizing", "message": "Tokenizing data"}
             if self.training_callback:
                 self.training_callback("Tokenizing training data", "INFO")
-            
+
             # Create label encoder
             if not SKLEARN_AVAILABLE:
                 self._log_debug("sklearn not available for LabelEncoder, using manual mapping")
-                # Manual implementation of label encoding
                 unique_labels = list(set(labels))
                 label_map = {label: i for i, label in enumerate(unique_labels)}
                 int_labels = [label_map[label] for label in labels]
                 inverse_label_map = {i: label for label, i in label_map.items()}
             else:
-                # Use sklearn's LabelEncoder
                 le = LabelEncoder()
                 int_labels = le.fit_transform(labels)
                 inverse_label_map = {i: label for i, label in enumerate(le.classes_)}
-            
+
             self._log_debug(f"Label mapping: {inverse_label_map}")
             num_labels = len(inverse_label_map)
-            
+
             # Create Dataset object
             data_dict = {'text': texts, 'label': int_labels}
             hf_dataset = datasets.Dataset.from_dict(data_dict)
-            
+
             # Load pre-trained tokenizer
             tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
-            
+
             # Tokenize dataset
             def tokenize_function(examples):
                 return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=128)
-                
+
             tokenized_dataset = hf_dataset.map(tokenize_function, batched=True)
             self._log_debug(f"Tokenized dataset successfully")
-            
+
             # Check for stop request
             if self.training_should_stop:
                 self._log_debug("Training stopped by request after tokenization")
-                return False
-            
+                return self.GRACEFUL_STOP
+
             # Update progress
             self.training_progress = {"status": "training", "message": "Training model"}
             if self.training_callback:
                 self.training_callback("Training model", "INFO")
-            
+
             # Load pre-trained model
             model = AutoModelForSequenceClassification.from_pretrained(
-                self.MODEL_NAME, 
+                self.MODEL_NAME,
                 num_labels=num_labels
             )
-            
+
             # Define custom checkpoint saving callback that respects stop flag
             class StoppableCheckpointCallback(TrainerCallback):
                 def __init__(self, outer_instance):
                     self.outer = outer_instance
+                    self.last_saved_step = -1  # Track the last step a checkpoint was saved
+                    self.last_checkpoint_path = None  # Store the path to the latest checkpoint
+
+                def _find_latest_checkpoint(self, output_dir):
+                    """
+                    Helper to find the latest checkpoint directory.
+                    Returns the full path to the latest checkpoint directory or None if no checkpoints exist.
+                    """
+                    latest_checkpoint = None
+                    latest_step = -1
                     
-                def on_epoch_end(self, args, state, control, **kwargs):
-                    self.outer._update_training_journal(
-                        "in_progress", 
-                        checkpoint=args.output_dir,
-                        epoch=state.epoch,
-                        batch=state.global_step
-                    )
-                    self.outer.training_progress = {
-                        "status": "training", 
-                        "message": f"Training in progress - Epoch {state.epoch:.1f}, Step {state.global_step}"
-                    }
-                    if self.outer.training_should_stop:
-                        self.outer._log_debug(f"Stopping training at epoch {state.epoch}, step {state.global_step}")
-                        control.should_training_stop = True
+                    if os.path.isdir(output_dir):
+                        checkpoints = [d for d in os.listdir(output_dir) if d.startswith("checkpoint-")]
+                        if checkpoints:
+                            # Sort by step number
+                            for checkpoint in checkpoints:
+                                try:
+                                    step = int(checkpoint.split('-')[-1])
+                                    if step > latest_step:
+                                        latest_step = step
+                                        latest_checkpoint = os.path.join(output_dir, checkpoint)
+                                except ValueError:
+                                    continue
+                    
+                    if latest_checkpoint:
+                        self.outer._log_debug(f"Found latest checkpoint: {latest_checkpoint} (step {latest_step})")
+                    else:
+                        self.outer._log_debug(f"No checkpoints found in {output_dir}")
+                        
+                    return latest_checkpoint
+
+                def on_save(self, args, state, control, **kwargs):
+                    """
+                    Called after a checkpoint save operation.
+                    Updates the journal with the path to the checkpoint that was just saved.
+                    """
+                    # Find the latest checkpoint directory
+                    latest_checkpoint = self._find_latest_checkpoint(args.output_dir)
+                    
+                    if latest_checkpoint:
+                        # Update our internal tracking of the last checkpoint
+                        self.last_checkpoint_path = latest_checkpoint
+                        self.last_saved_step = state.global_step
+                        
+                        # Log the checkpoint save
+                        self.outer._log_debug(f"Checkpoint saved at step {state.global_step}. Path: {latest_checkpoint}")
+                        
+                        # Update the training journal with this checkpoint path
+                        self.outer._update_training_journal(
+                            "in_progress",
+                            checkpoint=latest_checkpoint,
+                            epoch=state.epoch,
+                            batch=state.global_step
+                        )
+                    else:
+                        self.outer._log_debug(f"on_save called at step {state.global_step}, but couldn't find checkpoint directory.")
+                    
                     return control
+
+                def on_epoch_end(self, args, state, control, **kwargs):
+                    """Called at the end of an epoch."""
+                    self.outer._log_debug(f"Epoch {state.epoch:.1f} completed. Step {state.global_step}")
                     
+                    self.outer.training_progress = {
+                        "status": "training",
+                        "message": f"Epoch {state.epoch:.1f} completed. Step {state.global_step}"
+                    }
+                    
+                    # Check for stop request
+                    if self.outer.training_should_stop:
+                        self.outer._log_debug(f"Stop request detected at end of epoch {state.epoch}")
+                        
+                        # Make sure we update the journal with the latest checkpoint path before stopping
+                        if self.last_checkpoint_path:
+                            self.outer._log_debug(f"Ensuring latest checkpoint path is saved to journal: {self.last_checkpoint_path}")
+                            self.outer._update_training_journal(
+                                "interrupted",
+                                checkpoint=self.last_checkpoint_path,
+                                epoch=state.epoch,
+                                batch=state.global_step
+                            )
+                        
+                        # Signal the trainer to stop
+                        control.should_training_stop = True
+                    
+                    return control
+
                 def on_step_end(self, args, state, control, **kwargs):
-                    # Periodically update progress
+                    """Called at the end of a training step."""
+                    # Periodically update progress (not too frequently)
                     if state.global_step % 10 == 0:
                         self.outer.training_progress = {
-                            "status": "training", 
+                            "status": "training",
                             "message": f"Training in progress - Epoch {state.epoch:.1f}, Step {state.global_step}"
                         }
+
+                    # Check for stop request
                     if self.outer.training_should_stop:
-                        self.outer._log_debug(f"Stopping training at step {state.global_step}")
+                        self.outer._log_debug(f"Stop request detected at step {state.global_step}")
+                        
+                        # Make sure we update the journal with the latest checkpoint path before stopping
+                        if self.last_checkpoint_path:
+                            self.outer._log_debug(f"Ensuring latest checkpoint path is saved to journal: {self.last_checkpoint_path}")
+                            self.outer._update_training_journal(
+                                "interrupted",
+                                checkpoint=self.last_checkpoint_path,
+                                epoch=state.epoch,
+                                batch=state.global_step
+                            )
+                        
+                        # Signal the trainer to stop
                         control.should_training_stop = True
+                    
                     return control
-            
+
             # Define training arguments
             training_args = TrainingArguments(
                 output_dir=self.checkpoint_dir,
-                num_train_epochs=3,  # Adjust based on dataset size
-                per_device_train_batch_size=8,  # Adjust based on available memory
+                num_train_epochs=5,  # Increased from 3 to ensure we continue training
+                per_device_train_batch_size=8,
                 learning_rate=5e-5,
                 logging_dir=os.path.join(self.user_data_dir, "training_logs"),
                 logging_steps=10,
-                save_strategy="epoch",
-                load_best_model_at_end=False,  # Simplify for now
-                report_to="none",  # Disable reporting to avoid cloud services
+                save_strategy="steps",
+                save_steps=10,
+                save_total_limit=3,
+                load_best_model_at_end=False,
+                report_to="none",
+                # Important: Disable past metrics tracking to avoid epoch confusion
+                disable_tqdm=False,  # Show progress bars
+                remove_unused_columns=True,
             )
-            
+
             # Create Trainer with our stoppable callback
+            callback_instance = StoppableCheckpointCallback(self)
             trainer = Trainer(
                 model=model,
                 args=training_args,
                 train_dataset=tokenized_dataset,
-                callbacks=[StoppableCheckpointCallback(self)]
+                callbacks=[callback_instance]
             )
+
+            # Determine if resuming from checkpoint
+            resume_checkpoint_path = None
+            if self.recovery_needed and hasattr(self, 'recovery_checkpoint') and self.recovery_checkpoint:
+                if os.path.isdir(self.recovery_checkpoint):
+                    self._log_debug(f"Attempting to resume training from checkpoint: {self.recovery_checkpoint}")
+                    
+                    # Modify the checkpoint state to force continued training
+                    if self._modify_checkpoint_state(self.recovery_checkpoint):
+                        self._log_debug("Modified checkpoint state to force continued training")
+                    else:
+                        self._log_debug("Failed to modify checkpoint state - may complete instantly")
+                    
+                    resume_checkpoint_path = self.recovery_checkpoint
+                    if self.training_callback:
+                        self.training_callback(f"Resuming training from checkpoint", "INFO")
+                else:
+                    self._log_debug(f"Recovery checkpoint path is invalid: {self.recovery_checkpoint}")
+                    
+                    # Try to find the latest checkpoint in the checkpoint directory as fallback
+                    latest_checkpoint = self._find_latest_checkpoint(self.checkpoint_dir)
+                    if latest_checkpoint:
+                        self._log_debug(f"Found latest checkpoint as fallback: {latest_checkpoint}")
+                        
+                        # Modify the checkpoint state
+                        if self._modify_checkpoint_state(latest_checkpoint):
+                            self._log_debug("Modified fallback checkpoint state to force continued training")
+                        else:
+                            self._log_debug("Failed to modify fallback checkpoint state")
+                            
+                        resume_checkpoint_path = latest_checkpoint
+                        if self.training_callback:
+                            self.training_callback(f"Resuming from fallback checkpoint", "INFO")
             
-            # Train the model
-            self._log_debug("Starting trainer.train()")
-            trainer.train()
+            # Log the resume path for debugging
+            resume_path_for_log = resume_checkpoint_path if resume_checkpoint_path else "None (Starting Fresh)"
+            self._log_debug(f"Calling trainer.train() with resume_from_checkpoint='{resume_path_for_log}'")
             
+            # Train the model, potentially resuming
+            trainer.train(resume_from_checkpoint=resume_checkpoint_path)
+
             # Check if we stopped early
             if self.training_should_stop:
-                self._log_debug("Training was stopped by request, not saving model")
-                return False
-                
+                self._log_debug("Training was stopped by request, not saving final model")
+                # Important: Return special value to indicate graceful stop
+                return self.GRACEFUL_STOP
+
             self._log_debug("Completed trainer.train()")
-            
+
             # Update progress
             self.training_progress = {"status": "saving", "message": "Saving trained model"}
             if self.training_callback:
                 self.training_callback("Saving trained model", "INFO")
-            
+
             # Create fine-tuned model directory if it doesn't exist
             os.makedirs(self.fine_tuned_model_dir, exist_ok=True)
-            
+
             # Save the fine-tuned model and tokenizer
             self._log_debug(f"Saving fine-tuned model to {self.fine_tuned_model_dir}")
             trainer.save_model(self.fine_tuned_model_dir)
             tokenizer.save_pretrained(self.fine_tuned_model_dir)
-            
+
             # Save the label map
             with open(self.label_map_path, 'w') as f:
                 json.dump(inverse_label_map, f)
-            
+
             self._log_debug(f"Saved label map to {self.label_map_path}")
-            
+
             # Check for stop request before ONNX export
             if self.training_should_stop:
                 self._log_debug("Training stopped by request before ONNX export")
-                return False
-            
+                # Return special value to indicate graceful stop
+                return self.GRACEFUL_STOP
+
             # Export to ONNX if available
             if ONNX_AVAILABLE:
                 self._log_debug("ONNX is available, starting export")
                 self.training_progress = {"status": "exporting", "message": "Exporting to ONNX format"}
                 if self.training_callback:
                     self.training_callback("Exporting to ONNX format", "INFO")
-                
+
                 success = self._export_to_onnx(model, tokenizer)
                 if not success:
                     self._log_debug("ONNX export failed but model training succeeded")
-                    # Continue anyway, inference can still use PyTorch model
+                    # Mark as incomplete for journal
+                    self._update_training_journal("completed_no_onnx")
             else:
                 self._log_debug("ONNX is not available, skipping export")
-            
+                # Mark as complete without ONNX in journal
+                self._update_training_journal("completed_no_onnx")
+
             # If we made it here, training was successful
             self.data_changed = False
-            
-            # Clean up journal
+            self.recovery_needed = False  # Reset recovery flag after successful completion
+
+            # Clean up journal only on successful completion
             self._clear_training_journal()
             
             # Clean up legacy files if they exist
             if os.path.exists(self.legacy_model_path):
-                # Just create a placeholder instead of deleting to avoid errors
                 try:
                     with open(self.legacy_model_path, 'wb') as f:
                         pickle.dump("PLACEHOLDER - Using Transformer Model", f)
@@ -890,6 +1174,7 @@ class LearningService:
         except Exception as e:
             self._log_debug(f"Error training transformer model: {e}")
             logger.error(f"Error training transformer model: {e}", exc_info=True)
+            self._update_training_journal("failed")
             return False
     
     def _export_to_onnx(self, model, tokenizer) -> bool:
