@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Callable, List, Dict, Any, Optional, Tuple
 
 from models.paragraph import Paragraph, ParaRole
+from transformers.trainer_callback import TrainerCallback
 
 logger = logging.getLogger(__name__)
 
@@ -112,10 +113,19 @@ class LearningService:
         self.is_training = False
         self.training_progress = {"status": "idle", "message": "No training in progress"}
         self.training_callback = None
+
+        # Data Journaling for seamless training after shutdown
+        self.training_journal_path = os.path.join(self.user_data_dir, "training_journal.json")
+        self.checkpoint_dir = os.path.join(self.user_data_dir, "training_checkpoints")
+        self.training_should_stop = False
+        self.training_completed = threading.Event()
         
         # Copy initial resources if needed
         self._init_resources()
-        
+
+        # Set up training
+        self._initialize_training_state()
+
         # Force training if we have data but no model
         total_examples = sum(len(examples) for role, examples in self.training_data.items())
         if total_examples >= 10 and not os.path.exists(self.onnx_model_path) and TRANSFORMERS_AVAILABLE:
@@ -439,6 +449,121 @@ class LearningService:
         
         return result
     
+    def _initialize_training_state(self):
+        """Initialize training state and check for recovery."""
+        # Create checkpoint directory if it doesn't exist
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        
+        # Check if there's a journal file indicating incomplete training
+        if os.path.exists(self.training_journal_path):
+            try:
+                with open(self.training_journal_path, 'r') as f:
+                    journal = json.load(f)
+                
+                if journal.get('status') == 'in_progress':
+                    self._log_debug(f"Found incomplete training session in journal: {journal}")
+                    
+                    # If it's been less than 24 hours, we might want to recover
+                    last_update = datetime.fromisoformat(journal.get('last_update', '2000-01-01T00:00:00'))
+                    now = datetime.now()
+                    hours_since_update = (now - last_update).total_seconds() / 3600
+                    
+                    if hours_since_update < 24:
+                        self._log_debug(f"Training session is recent ({hours_since_update:.1f} hours old), will attempt recovery")
+                        # Set flag to attempt recovery on next training request
+                        self.recovery_needed = True
+                        self.recovery_checkpoint = journal.get('last_checkpoint')
+                        return
+                
+                # If we got here, either status isn't in_progress or it's too old
+                self._log_debug("Cleaning up old training journal")
+                self._clear_training_journal()
+                self.recovery_needed = False
+                
+            except Exception as e:
+                self._log_debug(f"Error reading training journal: {e}")
+                self._clear_training_journal()
+                self.recovery_needed = False
+        else:
+            self.recovery_needed = False
+
+    def _clear_training_journal(self):
+        """Clear the training journal file."""
+        try:
+            if os.path.exists(self.training_journal_path):
+                os.remove(self.training_journal_path)
+            self._log_debug("Training journal cleared")
+        except Exception as e:
+            self._log_debug(f"Error clearing training journal: {e}")
+
+    def _update_training_journal(self, status, checkpoint=None, epoch=None, batch=None):
+        """
+        Update the training journal with current status.
+        
+        Args:
+            status: Current training status (starting, in_progress, completed, failed)
+            checkpoint: Path to the latest checkpoint
+            epoch: Current epoch number
+            batch: Current batch number
+        """
+        try:
+            journal = {
+                'status': status,
+                'last_update': datetime.now().isoformat(),
+                'last_checkpoint': checkpoint,
+                'epoch': epoch,
+                'batch': batch
+            }
+            
+            # Write to a temporary file first
+            temp_path = f"{self.training_journal_path}.tmp"
+            with open(temp_path, 'w') as f:
+                json.dump(journal, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())  # Ensure data is written to disk
+            
+            # Then rename to the actual file
+            os.replace(temp_path, self.training_journal_path)
+            
+            self._log_debug(f"Updated training journal: {journal}")
+        except Exception as e:
+            self._log_debug(f"Error updating training journal: {e}")
+
+    def gracefully_stop_training(self):
+        """
+        Signal the training thread to stop gracefully.
+        Returns True when training is confirmed stopped or wasn't running.
+        """
+        if self.is_training and hasattr(self, 'training_thread') and self.training_thread and self.training_thread.is_alive():
+            self._log_debug("Signaling training thread to stop gracefully")
+            
+            # Set the stop flag
+            self.training_should_stop = True
+            
+            # Wait for a short time to see if training stops normally
+            if not self.training_completed.wait(timeout=2.0):
+                # If not completed after timeout, take more aggressive action
+                self._log_debug("Training didn't stop gracefully, forcing stop")
+                
+                # Force is_training to False to prevent hanging
+                self.is_training = False
+                
+                # Update journal to record interruption
+                self._update_training_journal("interrupted")
+                
+                # Set completed event to unblock any waiting code
+                self.training_completed.set()
+                
+                # No need to join thread - we'll let it conclude naturally
+                return True
+            
+            self._log_debug("Training stopped gracefully")
+            return True
+        
+        # No training in progress or already stopped
+        self._log_debug("No active training to stop")
+        return True
+
     def train_model(self, force: bool = False, background: bool = True, callback: Optional[Callable[[str, str], None]] = None) -> bool:
         """
         Train a new model if data has changed.
@@ -482,6 +607,10 @@ class LearningService:
         # Set callback if provided
         self.training_callback = callback
         
+        # Reset the stop flag
+        self.training_should_stop = False
+        self.training_completed.clear()
+        
         # If running in background
         if background:
             self._log_debug(f"Starting training in background thread")
@@ -489,11 +618,14 @@ class LearningService:
             self.is_training = True
             self.training_progress = {"status": "starting", "message": "Starting training process"}
             
-            # Create and start training thread
+            # Update journal to indicate we're starting
+            self._update_training_journal("starting")
+            
+            # Create and start training thread - note the daemon=False setting
             self.training_thread = threading.Thread(
                 target=self._train_model_thread, 
                 args=(force,),
-                daemon=True
+                daemon=False  # Non-daemon thread to allow completion
             )
             self.training_thread.start()
             
@@ -516,22 +648,27 @@ class LearningService:
             success = self._train_model_internal(force)
             if success:
                 self.training_progress = {"status": "completed", "message": "Training completed successfully"}
+                self._update_training_journal("completed")
                 if self.training_callback:
                     self.training_callback("Training completed successfully", "INFO")
             else:
                 self.training_progress = {"status": "failed", "message": "Training failed"}
+                self._update_training_journal("failed")
                 if self.training_callback:
                     self.training_callback("Training failed", "ERROR")
         except Exception as e:
             self._log_debug(f"Error in training thread: {e}")
             logger.error(f"Error in training thread: {e}", exc_info=True)
             self.training_progress = {"status": "error", "message": f"Training error: {str(e)}"}
+            self._update_training_journal("failed", epoch=None, batch=None)
             if self.training_callback:
                 self.training_callback(f"Training error: {str(e)}", "ERROR")
         finally:
             # Mark as no longer training
             self.is_training = False
-            
+            # Signal that training is complete
+            self.training_completed.set()
+
     def _train_model_internal(self, force: bool) -> bool:
         """
         Internal implementation of model training.
@@ -548,6 +685,7 @@ class LearningService:
         try:
             # Update training progress
             self.training_progress = {"status": "preparing", "message": "Preparing training data"}
+            self._update_training_journal("in_progress", epoch=0, batch=0)
             if self.training_callback:
                 self.training_callback("Preparing training data", "INFO")
                 
@@ -561,6 +699,11 @@ class LearningService:
                     labels.append(role)
             
             self._log_debug(f"Prepared {len(texts)} examples for training")
+            
+            # Check for stop request
+            if self.training_should_stop:
+                self._log_debug("Training stopped by request during data preparation")
+                return False
             
             # Update progress
             self.training_progress = {"status": "tokenizing", "message": "Tokenizing data"}
@@ -598,6 +741,11 @@ class LearningService:
             tokenized_dataset = hf_dataset.map(tokenize_function, batched=True)
             self._log_debug(f"Tokenized dataset successfully")
             
+            # Check for stop request
+            if self.training_should_stop:
+                self._log_debug("Training stopped by request after tokenization")
+                return False
+            
             # Update progress
             self.training_progress = {"status": "training", "message": "Training model"}
             if self.training_callback:
@@ -609,9 +757,42 @@ class LearningService:
                 num_labels=num_labels
             )
             
+            # Define custom checkpoint saving callback that respects stop flag
+            class StoppableCheckpointCallback(TrainerCallback):
+                def __init__(self, outer_instance):
+                    self.outer = outer_instance
+                    
+                def on_epoch_end(self, args, state, control, **kwargs):
+                    self.outer._update_training_journal(
+                        "in_progress", 
+                        checkpoint=args.output_dir,
+                        epoch=state.epoch,
+                        batch=state.global_step
+                    )
+                    self.outer.training_progress = {
+                        "status": "training", 
+                        "message": f"Training in progress - Epoch {state.epoch:.1f}, Step {state.global_step}"
+                    }
+                    if self.outer.training_should_stop:
+                        self.outer._log_debug(f"Stopping training at epoch {state.epoch}, step {state.global_step}")
+                        control.should_training_stop = True
+                    return control
+                    
+                def on_step_end(self, args, state, control, **kwargs):
+                    # Periodically update progress
+                    if state.global_step % 10 == 0:
+                        self.outer.training_progress = {
+                            "status": "training", 
+                            "message": f"Training in progress - Epoch {state.epoch:.1f}, Step {state.global_step}"
+                        }
+                    if self.outer.training_should_stop:
+                        self.outer._log_debug(f"Stopping training at step {state.global_step}")
+                        control.should_training_stop = True
+                    return control
+            
             # Define training arguments
             training_args = TrainingArguments(
-                output_dir=os.path.join(self.user_data_dir, "training_checkpoints"),
+                output_dir=self.checkpoint_dir,
                 num_train_epochs=3,  # Adjust based on dataset size
                 per_device_train_batch_size=8,  # Adjust based on available memory
                 learning_rate=5e-5,
@@ -622,16 +803,23 @@ class LearningService:
                 report_to="none",  # Disable reporting to avoid cloud services
             )
             
-            # Create Trainer
+            # Create Trainer with our stoppable callback
             trainer = Trainer(
                 model=model,
                 args=training_args,
                 train_dataset=tokenized_dataset,
+                callbacks=[StoppableCheckpointCallback(self)]
             )
             
             # Train the model
             self._log_debug("Starting trainer.train()")
             trainer.train()
+            
+            # Check if we stopped early
+            if self.training_should_stop:
+                self._log_debug("Training was stopped by request, not saving model")
+                return False
+                
             self._log_debug("Completed trainer.train()")
             
             # Update progress
@@ -653,6 +841,11 @@ class LearningService:
             
             self._log_debug(f"Saved label map to {self.label_map_path}")
             
+            # Check for stop request before ONNX export
+            if self.training_should_stop:
+                self._log_debug("Training stopped by request before ONNX export")
+                return False
+            
             # Export to ONNX if available
             if ONNX_AVAILABLE:
                 self._log_debug("ONNX is available, starting export")
@@ -669,6 +862,9 @@ class LearningService:
             
             # If we made it here, training was successful
             self.data_changed = False
+            
+            # Clean up journal
+            self._clear_training_journal()
             
             # Clean up legacy files if they exist
             if os.path.exists(self.legacy_model_path):
@@ -891,21 +1087,98 @@ class LearningService:
         Returns:
             Dict with statistics
         """
-        stats = {
-            'total_examples': sum(len(examples) for examples in self.training_data.values()),
-            'by_class': {role: len(examples) for role, examples in self.training_data.items()},
-            'has_model': (os.path.exists(self.onnx_model_path) or 
-                          os.path.exists(os.path.join(self.fine_tuned_model_dir, "pytorch_model.bin"))),
-            'model_path': self.fine_tuned_model_dir,
-            'onnx_path': self.onnx_model_path,
-            'transformers_available': TRANSFORMERS_AVAILABLE,
-            'onnx_available': ONNX_AVAILABLE,
-            'user_data_dir': self.user_data_dir,
-            'data_changed': self.data_changed,
-            'is_training': self.is_training
-        }
-        self._log_debug(f"Generated training stats: {stats}")
-        return stats
+        try:
+            # Ensure training data is valid
+            if not hasattr(self, 'training_data') or self.training_data is None:
+                self._log_debug("Training data not initialized, creating empty structure")
+                self.training_data = {
+                    'question': [],
+                    'answer': [],
+                    'ignore': []
+                }
+            
+            # Basic stats
+            total_examples = sum(len(examples) for role, examples in self.training_data.items())
+            by_class = {role: len(examples) for role, examples in self.training_data.items()}
+            
+            # Model existence checks
+            onnx_exists = os.path.exists(self.onnx_model_path)
+            pytorch_model_exists = os.path.exists(os.path.join(self.fine_tuned_model_dir, "pytorch_model.bin"))
+            has_model = onnx_exists or pytorch_model_exists
+            
+            # Additional model details
+            model_details = {}
+            if onnx_exists:
+                try:
+                    model_details['onnx_size'] = os.path.getsize(self.onnx_model_path)
+                    model_details['onnx_modified'] = os.path.getmtime(self.onnx_model_path)
+                except Exception as e:
+                    self._log_debug(f"Error getting ONNX model details: {e}")
+            
+            if pytorch_model_exists:
+                try:
+                    model_details['pytorch_size'] = os.path.getsize(os.path.join(self.fine_tuned_model_dir, "pytorch_model.bin"))
+                    model_details['pytorch_modified'] = os.path.getmtime(os.path.join(self.fine_tuned_model_dir, "pytorch_model.bin"))
+                except Exception as e:
+                    self._log_debug(f"Error getting PyTorch model details: {e}")
+            
+            # Training state details
+            training_thread_alive = False
+            if hasattr(self, 'training_thread') and self.training_thread is not None:
+                training_thread_alive = self.training_thread.is_alive()
+            
+            # Validate AI availability
+            ai_available = False
+            if hasattr(self, 'TRANSFORMERS_AVAILABLE') and hasattr(self, 'ONNX_AVAILABLE'):
+                ai_available = TRANSFORMERS_AVAILABLE and ONNX_AVAILABLE
+            elif 'TRANSFORMERS_AVAILABLE' in globals() and 'ONNX_AVAILABLE' in globals():
+                ai_available = TRANSFORMERS_AVAILABLE and ONNX_AVAILABLE
+            
+            # Training mode
+            manual_training_mode = True
+            if hasattr(self, 'is_manual_training_mode') and callable(self.is_manual_training_mode):
+                try:
+                    manual_training_mode = self.is_manual_training_mode()
+                except Exception as e:
+                    self._log_debug(f"Error getting manual training mode: {e}")
+            
+            # Create stats dictionary
+            stats = {
+                'total_examples': total_examples,
+                'by_class': by_class,
+                'has_model': has_model,
+                'model_path': self.fine_tuned_model_dir,
+                'onnx_path': self.onnx_model_path,
+                'transformers_available': TRANSFORMERS_AVAILABLE if 'TRANSFORMERS_AVAILABLE' in globals() else False,
+                'onnx_available': ONNX_AVAILABLE if 'ONNX_AVAILABLE' in globals() else False,
+                'user_data_dir': self.user_data_dir,
+                'data_changed': self.data_changed if hasattr(self, 'data_changed') else False,
+                'is_training': self.is_training if hasattr(self, 'is_training') else False,
+                'training_thread_alive': training_thread_alive,
+                'training_progress': getattr(self, 'training_progress', {'status': 'unknown', 'message': 'No information available'}),
+                'model_details': model_details,
+                'ai_available': ai_available,
+                'manual_training_mode': manual_training_mode
+            }
+            
+            self._log_debug(f"Generated training stats: {stats}")
+            return stats
+            
+        except Exception as e:
+            self._log_debug(f"Error generating training stats: {e}")
+            logger.error(f"Error generating training stats: {e}", exc_info=True)
+            
+            # Return minimal stats to avoid crashing
+            return {
+                'total_examples': 0,
+                'by_class': {'question': 0, 'answer': 0, 'ignore': 0},
+                'has_model': False,
+                'error': str(e),
+                'transformers_available': False,
+                'onnx_available': False,
+                'ai_available': False,
+                'manual_training_mode': True
+            }
     
     def reset_all_training_data(self) -> bool:
         """

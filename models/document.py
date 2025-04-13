@@ -3,6 +3,7 @@ Document model for handling document data and operations.
 """
 import logging
 import os
+import threading
 from typing import List, Dict, Optional, Set, Tuple, Any, Callable
 
 from models.paragraph import Paragraph, ParaRole
@@ -27,6 +28,8 @@ class Document:
         self.expected_question_count: int = 0
         self._current_q_num: int = 0
         self.config_manager = config_manager or ConfigManager()
+        self._loading_thread = None
+        self._analyzing_thread = None
         
     def load_file(self, file_path: str, status_callback: Callable[[str], None]) -> bool:
         """
@@ -68,6 +71,61 @@ class Document:
         except Exception as e:
             logger.error(f"Error loading or processing file: {e}", exc_info=True)
             return False
+    
+    def load_file_async(self, file_path: str, status_callback: Callable[[str], None],
+                       completion_callback: Callable[[bool], None]) -> None:
+        """
+        Load a DOCX file asynchronously, extract paragraphs, run initial analysis.
+        
+        Args:
+            file_path: Path to the DOCX file
+            status_callback: Callback function for status updates
+            completion_callback: Callback function receiving success flag upon completion
+        """
+        self.file_path = file_path
+        status_callback(f"Loading: {os.path.basename(file_path)}...")
+        
+        # Define callbacks
+        def on_paragraphs_loaded(raw_paragraphs, exception):
+            if exception:
+                logger.error(f"Error loading file: {exception}")
+                completion_callback(False)
+                return
+            
+            if not raw_paragraphs:
+                logger.error("Document contains no readable text.")
+                completion_callback(False)
+                return
+                
+            status_callback("Document loaded. Starting paragraph analysis...")
+            
+            # Create analysis service with config
+            analysis_config = self.config_manager.get_config('analysis')
+            analysis_service = AnalysisService(analysis_config)
+            
+            # Define analysis callback
+            def on_analysis_complete(question_indices, est_count, exception):
+                if exception:
+                    logger.error(f"Error analyzing paragraphs: {exception}")
+                    completion_callback(False)
+                    return
+                
+                # Set expected count
+                self.expected_question_count = est_count
+                
+                # Process paragraphs
+                self._process_paragraphs(raw_paragraphs, question_indices)
+                
+                # Signal completion
+                completion_callback(True)
+            
+            # Analyze paragraphs asynchronously
+            self._analyzing_thread = analysis_service.analyze_paragraphs_async(
+                raw_paragraphs, status_callback, on_analysis_complete
+            )
+        
+        # Load paragraphs asynchronously
+        self._loading_thread = FileService.load_docx_paragraphs_async(file_path, on_paragraphs_loaded)
     
     def _process_paragraphs(self, raw_paragraphs: List[str], question_indices: Set[int]) -> None:
         """
@@ -235,3 +293,13 @@ class Document:
         """Set the expected question count."""
         if count > 0:
             self.expected_question_count = count
+            
+    def cancel_loading(self) -> None:
+        """
+        Attempt to cancel any ongoing loading or analysis operations.
+        Note: This doesn't actually stop the threads, since Python threads
+        can't be forcibly terminated, but it allows the Document to be
+        reset to a clean state.
+        """
+        self._loading_thread = None
+        self._analyzing_thread = None

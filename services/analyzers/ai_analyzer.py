@@ -4,6 +4,7 @@ AI-based paragraph analyzer using transformer models with ONNX runtime.
 import logging
 import os
 import platform
+import threading
 from datetime import datetime
 from typing import List, Set, Tuple, Callable, Dict, Any, Optional
 import json
@@ -216,6 +217,100 @@ class AIAnalyzer(BaseAnalyzer):
             return self.fallback_analyzer.analyze(paragraphs, status_callback)
         
         return question_indices, estimated_count
+    
+    def analyze_async(self, paragraphs: List[str], status_callback: Callable[[str], None], 
+                      completion_callback: Callable[[Set[int], int, Optional[Exception]], None]) -> threading.Thread:
+        """
+        Analyze paragraphs using AI asynchronously.
+        
+        Args:
+            paragraphs: List of paragraph texts
+            status_callback: Callback function for status updates
+            completion_callback: Callback function receiving (indices, count, exception) upon completion
+            
+        Returns:
+            Thread object
+        """
+        def _analyze_thread():
+            try:
+                # Check if model is available
+                if not (TRANSFORMERS_AVAILABLE and ONNX_AVAILABLE) or self.onnx_session is None or self.tokenizer is None:
+                    self.logger.warning("ONNX model not available - using fallback analyzer")
+                    status_callback("AI model not available. Falling back to heuristic analysis...")
+                    # Run fallback analyzer but still in this thread
+                    question_indices, estimated_count = self.fallback_analyzer.analyze(paragraphs, status_callback)
+                    completion_callback(question_indices, estimated_count, None)
+                    return
+                
+                self.logger.info(f"Running transformer-based analysis on {len(paragraphs)} paragraphs")
+                status_callback("Running transformer-based analysis...")
+                
+                # Get estimated count (using heuristic method)
+                estimated_count = self.fallback_analyzer._estimate_question_count(paragraphs, status_callback)
+                self.logger.info(f"Estimated question count: {estimated_count}")
+                status_callback(f"Estimated question count from document structure: {estimated_count}")
+                
+                # Run classification asynchronously
+                def on_classification_complete(question_indices, exception):
+                    if exception:
+                        self.logger.error(f"Error in AI classification: {exception}")
+                        status_callback("Error in AI classification. Falling back to heuristic analysis...")
+                        try:
+                            # Fall back to heuristic analyzer
+                            q_indices, est_count = self.fallback_analyzer.analyze(paragraphs, status_callback)
+                            completion_callback(q_indices, est_count, None)
+                        except Exception as e:
+                            completion_callback(None, 0, e)
+                        return
+                        
+                    self.logger.info(f"Transformer model identified {len(question_indices)} questions, expected ~{estimated_count}")
+                    
+                    # If we got too few questions, fall back to heuristics
+                    if len(question_indices) < estimated_count * 0.5:
+                        self.logger.warning(f"AI model found too few questions ({len(question_indices)}) compared to expected ({estimated_count})")
+                        status_callback(f"AI model found too few questions. Falling back to heuristic analysis...")
+                        try:
+                            # Fall back to heuristic analyzer
+                            q_indices, est_count = self.fallback_analyzer.analyze(paragraphs, status_callback)
+                            completion_callback(q_indices, est_count, None)
+                        except Exception as e:
+                            completion_callback(None, 0, e)
+                    else:
+                        # Use AI results
+                        completion_callback(question_indices, estimated_count, None)
+                
+                # Start classification in this thread (it's already in a background thread)
+                self._classify_paragraphs_async(paragraphs, status_callback, on_classification_complete)
+                
+            except Exception as e:
+                self.logger.error(f"Error in async analysis: {e}", exc_info=True)
+                completion_callback(None, 0, e)
+        
+        # Create and start thread
+        thread = threading.Thread(target=_analyze_thread)
+        thread.daemon = True
+        thread.start()
+        
+        return thread
+    
+    def _classify_paragraphs_async(self, paragraphs: List[str], status_callback: Callable[[str], None],
+                                  completion_callback: Callable[[Set[int], Optional[Exception]], None]) -> None:
+        """
+        Classify paragraphs using the ONNX model asynchronously.
+        
+        Args:
+            paragraphs: List of paragraph texts
+            status_callback: Callback function for status updates
+            completion_callback: Callback function receiving (question_indices, exception) upon completion
+        """
+        try:
+            # This method is expected to be called from an already-running background thread
+            # so we perform the work directly instead of creating another thread
+            question_indices = self._classify_paragraphs(paragraphs, status_callback)
+            completion_callback(question_indices, None)
+        except Exception as e:
+            self.logger.error(f"Error in classification: {e}", exc_info=True)
+            completion_callback(None, e)
     
     def _classify_paragraphs(self, paragraphs: List[str], status_callback: Callable[[str], None]) -> Set[int]:
         """

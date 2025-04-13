@@ -1,6 +1,7 @@
 """
 Main presenter for handling application logic.
 """
+from datetime import datetime
 import logging
 import os
 from typing import Optional
@@ -41,36 +42,44 @@ class MainPresenter:
         """Handle a load file request."""
         # Reset UI state
         self.view.reset_ui()
-        self.document = Document()
+        self.document = Document(self.config_manager)
         
         # Get file path from dialog
         file_path = FileService.select_docx_file()
         if not file_path:
             return
         
-        # Update status
+        # Update status and disable UI
         self.view.show_status(f"Loading: {os.path.basename(file_path)}...")
         self.view.log_message(f"Loading file: {file_path}")
+        self.view.set_loading_state(True)  # Disable UI during loading
+        
+        # Define completion callback
+        def on_load_complete(success):
+            # Re-enable UI
+            self.view.set_loading_state(False)
+            
+            if success:
+                # Update UI with paragraphs
+                self.view.display_paragraphs(self.document.paragraphs)
+                
+                # Update expected count in UI
+                self.view.set_expected_count(self.document.expected_question_count)
+                
+                # Update stats display
+                self._update_stats()
+                
+                # Ready status
+                self.view.show_status("Ready for verification. Select a paragraph.")
+            else:
+                self.view.show_error("Error", "Failed to load or process the document.")
+                self.view.show_status("Error loading document.")
         
         # Load document with a status callback that updates the view
         status_callback = self.view.show_status
         
-        # Load and process document
-        if self.document.load_file(file_path, status_callback):
-            # Update UI with paragraphs
-            self.view.display_paragraphs(self.document.paragraphs)
-            
-            # Update expected count in UI
-            self.view.set_expected_count(self.document.expected_question_count)
-            
-            # Update stats display
-            self._update_stats()
-            
-            # Ready status
-            self.view.show_status("Ready for verification. Select a paragraph.")
-        else:
-            self.view.show_error("Error", "Failed to load or process the document.")
-            self.view.show_status("Error loading document.")
+        # Load and process document asynchronously
+        self.document.load_file_async(file_path, status_callback, on_load_complete)
     
     def save_file_requested(self) -> None:
         """Handle a save file request."""
@@ -221,23 +230,113 @@ class MainPresenter:
 
     def show_ai_stats_requested(self) -> None:
         """Show AI training statistics."""
-        stats = self.learning_service.get_training_stats()
-        
-        message = (
-            f"AI Training Statistics:\n\n"
-            f"Total training examples: {stats['total_examples']}\n\n"
-            f"Examples by class:\n"
-            f"- Questions: {stats['by_class'].get('question', 0)}\n"
-            f"- Answers: {stats['by_class'].get('answer', 0)}\n"
-            f"- Ignore: {stats['by_class'].get('ignore', 0)}\n\n"
-            f"Model exists: {stats['has_model']}\n"
-            f"AI components available: {stats['ai_available']}\n"
-            f"Data directory: {stats['user_data_dir']}\n"
-            f"Model path: {stats['model_path']}\n"
-            f"Data changed since last training: {stats['data_changed']}"
-        )
-        
-        self.view.show_info("AI Training Stats", message)
+        try:
+            self.view.log_message("Gathering AI training statistics...", "INFO")
+            
+            # Get basic stats from learning service
+            stats = self.learning_service.get_training_stats()
+            
+            # Extract main values with defaults in case keys are missing
+            total_examples = stats.get('total_examples', 0)
+            by_class = stats.get('by_class', {})
+            has_model = stats.get('has_model', False)
+            
+            # Get transformer and ONNX status
+            transformers_available = stats.get('transformers_available', False)
+            onnx_available = stats.get('onnx_available', False)
+            ai_available = stats.get('ai_available', False)
+            
+            # Format data for better readability
+            question_count = by_class.get('question', 0)
+            answer_count = by_class.get('answer', 0)
+            ignore_count = by_class.get('ignore', 0)
+            
+            # Add model details
+            model_path = stats.get('model_path', 'Unknown')
+            onnx_path = stats.get('onnx_path', 'Unknown')
+            user_data_dir = stats.get('user_data_dir', 'Unknown')
+            data_changed = stats.get('data_changed', False)
+            is_training = stats.get('is_training', False)
+            manual_mode = stats.get('manual_training_mode', True)
+            
+            # Check model file existence explicitly
+            if has_model:
+                model_status = "✓ Model exists"
+                if os.path.exists(onnx_path):
+                    try:
+                        model_size = os.path.getsize(onnx_path) / (1024 * 1024)  # Convert to MB
+                        model_status += f" ({model_size:.2f} MB)"
+                        last_modified = datetime.fromtimestamp(os.path.getmtime(onnx_path))
+                        model_status += f"\n  Last updated: {last_modified.strftime('%Y-%m-%d %H:%M:%S')}"
+                    except:
+                        pass
+            else:
+                model_status = "✗ Model does not exist"
+            
+            # AI capability summary
+            capability_status = []
+            if transformers_available and onnx_available:
+                capability_status.append("✓ Full AI capability (Transformers + ONNX)")
+            elif transformers_available:
+                capability_status.append("⚠ Partial AI capability (Transformers only, no ONNX)")
+            elif onnx_available:
+                capability_status.append("⚠ Partial AI capability (ONNX only, no Transformers)")
+            else:
+                capability_status.append("✗ AI capability unavailable (requires Transformers and ONNX)")
+            
+            # Training status
+            if is_training:
+                training_status = "⟳ Training in progress"
+                if 'training_progress' in stats:
+                    progress = stats['training_progress']
+                    if isinstance(progress, dict) and 'status' in progress and 'message' in progress:
+                        training_status += f"\n  Status: {progress['status']}"
+                        training_status += f"\n  Message: {progress['message']}"
+            elif data_changed:
+                training_status = "⚠ Training data has changed since last training"
+            else:
+                training_status = "✓ Training data is up to date"
+                
+            # Training mode
+            mode_status = "Manual training mode" if manual_mode else "Automatic training mode"
+            
+            # Create formatted message
+            message = (
+                f"AI Training Statistics\n"
+                f"======================================\n\n"
+                f"Training Data:\n"
+                f"  Total examples: {total_examples}\n"
+                f"  Questions: {question_count}\n"
+                f"  Answers: {answer_count}\n"
+                f"  Ignore: {ignore_count}\n\n"
+                f"Model Status:\n"
+                f"  {model_status}\n\n"
+                f"AI Capability:\n"
+                f"  {capability_status[0]}\n"
+                f"  {mode_status}\n\n"
+                f"Training Status:\n"
+                f"  {training_status}\n\n"
+                f"File Locations:\n"
+                f"  User data directory:\n    {user_data_dir}\n"
+                f"  Model directory:\n    {model_path}\n"
+                f"  ONNX model path:\n    {onnx_path}"
+            )
+            
+            # Log success and show the info dialog
+            self.view.log_message("AI training statistics gathered successfully", "INFO")
+            self.view.show_info("AI Training Stats", message)
+            
+        except Exception as e:
+            # Log the error for debugging
+            error_message = f"Error showing AI training stats: {str(e)}"
+            self.view.log_message(error_message, "ERROR")
+            logger.error(error_message, exc_info=True)
+            
+            # Show error to user
+            self.view.show_error(
+                "Error Showing Stats", 
+                f"An error occurred while gathering AI training statistics:\n\n{str(e)}\n\nPlease check the log for details."
+            )
 
     def view_training_examples_requested(self) -> None:
         """Show a sample of training examples."""
@@ -615,7 +714,75 @@ class MainPresenter:
     def exit_requested(self) -> None:
         """Handle application exit requests."""
         logger.info("Exit requested by user")
-        self.root.quit()
+        
+        # Check if training is in progress
+        try:
+            is_training = False
+            if hasattr(self, 'learning_service'):
+                stats = self.learning_service.get_training_stats()
+                is_training = stats.get('is_training', False)
+                
+            if is_training:
+                # Ask user if they want to wait for training to complete
+                response = self.view.ask_yes_no_cancel(
+                    "Training in Progress",
+                    "AI model training is currently in progress.\n\n"
+                    "• Yes: Wait for training to complete (recommended)\n"
+                    "• No: Stop training and exit now\n"
+                    "• Cancel: Return to application\n\n"
+                    "Note: Stopping training prematurely may result in an incomplete model."
+                )
+                
+                if response is None:  # Cancel - abort exit
+                    self.view.log_message("Exit cancelled - training will continue", "INFO")
+                    return
+                elif response is True:  # Yes - wait for training
+                    self.view.log_message("Waiting for training to complete before exit...", "INFO")
+                    self.view.set_loading_state(True)  # Show loading state
+                    
+                    # Get the training thread
+                    training_thread = self.learning_service.training_thread if hasattr(self.learning_service, 'training_thread') else None
+                    
+                    # Wait for training thread to complete with timeout
+                    if training_thread and training_thread.is_alive():
+                        training_thread.join(timeout=10.0)  # Wait up to 10 seconds
+                    
+                    self.view.set_loading_state(False)
+                    
+                    # If still training after timeout, ask again
+                    if training_thread and training_thread.is_alive():
+                        force_exit = self.view.ask_yes_no(
+                            "Training Still in Progress",
+                            "Training is taking longer than expected.\n\n"
+                            "Do you want to force exit now? This will leave the model in an incomplete state."
+                        )
+                        if not force_exit:
+                            self.view.log_message("Exit cancelled - training will continue", "INFO")
+                            return
+                        
+                        # Force stop training
+                        if hasattr(self.learning_service, 'gracefully_stop_training'):
+                            self.learning_service.gracefully_stop_training()
+                else:  # No - stop training and exit
+                    self.view.log_message("Stopping training and exiting...", "INFO")
+                    if hasattr(self.learning_service, 'gracefully_stop_training'):
+                        self.learning_service.gracefully_stop_training()
+                        # Wait a moment for the stop to take effect
+                        self.learning_service.training_completed.wait(timeout=1.0)
+            
+            # Ensure UI is in normal state before exiting
+            self.view.set_loading_state(False)
+            
+            # Signal to the main thread we're actually exiting now
+            self.view.log_message("Application exiting now", "INFO")
+            
+            # Force destroy - stronger than quit() for handling stuck threads
+            self.root.after(100, self.root.destroy)
+            
+        except Exception as e:
+            logger.error(f"Error during exit handling: {e}", exc_info=True)
+            # Exit anyway - force destroy after a brief delay
+            self.root.after(100, self.root.destroy)
     
     def _update_stats(self) -> None:
         """Update statistics display."""

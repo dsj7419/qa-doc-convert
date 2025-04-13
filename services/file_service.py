@@ -6,8 +6,9 @@ import logging
 import os
 import platform
 import subprocess
+import threading
 from tkinter import filedialog
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Callable
 
 import docx
 
@@ -115,6 +116,40 @@ class FileService:
         except Exception as e:
             logger.error(f"Error loading DOCX file: {e}", exc_info=True)
             raise
+    
+    @staticmethod
+    def load_docx_paragraphs_async(file_path: str, callback: Callable[[List[str], Optional[Exception]], None]) -> threading.Thread:
+        """
+        Load paragraphs from a DOCX file asynchronously.
+        
+        Args:
+            file_path: Path to the DOCX file
+            callback: Callback function receiving (paragraphs, exception) upon completion
+            
+        Returns:
+            Thread object
+        """
+        def _load_thread():
+            try:
+                # Load document
+                doc = docx.Document(file_path)
+                raw_paragraphs = [p.text.strip() for p in doc.paragraphs if p.text and not p.text.isspace()]
+                logger.info(f"Extracted {len(raw_paragraphs)} non-empty paragraphs from: {file_path}")
+                
+                # Call callback with results and no exception
+                callback(raw_paragraphs, None)
+                
+            except Exception as e:
+                logger.error(f"Error loading DOCX file: {e}", exc_info=True)
+                # Call callback with no results and the exception
+                callback(None, e)
+        
+        # Create and start thread
+        thread = threading.Thread(target=_load_thread)
+        thread.daemon = True
+        thread.start()
+        
+        return thread
     
     @staticmethod
     def save_data_to_csv(data: List[List[str]], save_path: str) -> bool:

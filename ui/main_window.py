@@ -143,6 +143,9 @@ class MainWindow(IMainWindowView, IParagraphListView):
         # Log Panel - reduced height
         self.log_panel = LogPanel(self.root)
         self.log_panel.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 5))
+
+        # Add window close protocol handler for graceful shutdown
+        self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
     
     # IMainWindowView implementation
     def _toggle_manual_training_mode(self):
@@ -320,6 +323,33 @@ class MainWindow(IMainWindowView, IParagraphListView):
         """
         return self.action_panel.get_expected_count()
     
+    def set_loading_state(self, loading: bool) -> None:
+        """
+        Set the loading state of the UI.
+        
+        Args:
+            loading: Whether the application is in a loading state
+        """
+        # Disable/enable buttons and menu items
+        state = tk.DISABLED if loading else tk.NORMAL
+        
+        # Disable/enable file menu items
+        for i in range(self.menu_bar.index("end") + 1):
+            try:
+                self.menu_bar.entryconfig(i, state=state)
+            except:
+                pass  # Skip separators or other non-configurable items
+        
+        # Disable/enable header buttons
+        self.header.load_btn.config(state=state)
+        self.header.save_btn.config(state=state)
+        
+        # Visually indicate loading state
+        if loading:
+            self.root.config(cursor="wait")
+        else:
+            self.root.config(cursor="")
+    
     def enable_editing_actions(self, enabled: bool) -> None:
         """
         Enable or disable editing actions.
@@ -402,6 +432,15 @@ class MainWindow(IMainWindowView, IParagraphListView):
         """Handle set expected count button click."""
         if self.presenter:
             self.presenter.set_expected_count_requested()
+
+    def _on_window_close(self):
+        """Handle window close event (X button)."""
+        if self.presenter:
+            # Use the same logic as the Exit button
+            self.presenter.exit_requested()
+        else:
+            # No presenter, just quit
+            self.root.quit()
     
     def _on_exit(self) -> None:
         """Handle exit button click."""

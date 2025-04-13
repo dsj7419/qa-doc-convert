@@ -37,6 +37,16 @@ class IMainWindowView(IView):
     def show_warning(self, title: str, message: str) -> None:
         """Show a warning message."""
         pass
+
+    @abstractmethod
+    def set_loading_state(self, loading: bool) -> None:
+        """
+        Set the loading state of the UI.
+        
+        Args:
+            loading: Whether the application is in a loading state
+        """
+        pass
         
     @abstractmethod
     def ask_yes_no(self, title: str, message: str) -> bool:
