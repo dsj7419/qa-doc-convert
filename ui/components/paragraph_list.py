@@ -3,7 +3,7 @@ Paragraph list component.
 """
 import tkinter as tk
 from tkinter import ttk
-from typing import List, Callable, Optional, Set
+from typing import List, Callable, Set
 
 from models.paragraph import Paragraph, ParaRole
 from utils.theme import AppTheme

@@ -196,7 +196,7 @@ class MainWindow(IMainWindowView, IParagraphListView):
         messagebox.showinfo(
             "About QA Verifier",
             "QA Verifier Professional Edition\n\n"
-            "Version 1.0\n\n"
+            "Version 4.21\n\n"
             "A professional tool for verifying and processing Q&A documents, "
             "designed to convert Word documents into CSV format for use in "
             "various educational and testing applications."
