@@ -1,7 +1,36 @@
-python-docx>=0.8.11
-pytest>=7.0.0
-numpy>=1.20.0
-scikit-learn>=1.0.0
-joblib>=1.0.0
-pandas>=2.2.3
-appdirs>=1.4.4
+      
+# -------------------------------------------------------------
+# Core Application & Existing Dependencies
+# -------------------------------------------------------------
+python-docx>=0.8.11       # For reading .docx files
+numpy>=1.21.0           # Numerical operations (used by ML libs)
+pandas>=2.0.0           # Data manipulation (potentially useful, can be removed if unused later)
+appdirs>=1.4.4          # For finding platform-specific user data directories
+
+# -------------------------------------------------------------
+# Testing Framework
+# -------------------------------------------------------------
+pytest>=7.0.0           # Test runner
+
+# -------------------------------------------------------------
+# Dependencies for Transformer-Based AI (New)
+# -------------------------------------------------------------
+# --- Hugging Face Ecosystem ---
+transformers>=4.20.0    # Core library for models, tokenizers, pipelines
+datasets>=2.0.0         # Efficient data handling for training
+torch>=1.10.0           # Deep Learning Framework (PyTorch backend for transformers)
+# Note: Alternatively, you could use tensorflow instead of torch if preferred
+
+# --- ONNX for Local Inference ---
+onnx>=1.10.0            # Open Neural Network Exchange format library
+onnxruntime>=1.10.0     # Runtime engine to execute ONNX models efficiently
+
+# -------------------------------------------------------------
+# Scikit-learn (Still needed for LabelEncoder, potentially metrics)
+# -------------------------------------------------------------
+scikit-learn>=1.0.0     # ML utilities (LabelEncoder, evaluation metrics)
+
+# -------------------------------------------------------------
+# Joblib (May become optional - was likely for saving simple sklearn models)
+# -------------------------------------------------------------
+joblib>=1.0.0           # Used by scikit-learn, potentially for saving simple models (may be removable later)

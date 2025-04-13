@@ -2,47 +2,517 @@
     "question": [
       {
         "text": "There are 2 kinds of jurisdiction. What are they?",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
       },
       {
         "text": "What is the type of jurisdiction that relates only to federal courts?",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
       },
       {
         "text": "Name 2 grounds that give rise to federal court jurisdiction.",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Name the 3 types of matters that are within federal question jurisdiction.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Name 2 requirements for federal diversity jurisdiction.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is it called when a defendant wants a case that has been filed in state court to be heard instead by a federal court?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What must the defendant prove in order to get the federal courts to take the case?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "When the defendant’s theory for the federal court taking jurisdiction over a matter that P filed in state court is based on diversity of citizenship, the defendants must prove 2 additional things. They are…",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Where a federal court has taken jurisdiction over a matter that P filed originally in state court and P wants the matter returned back to the state court, what is that called?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Where the federal court took jurisdiction based on a federal question, what must be proved for the federal court to send the matter back to state court?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Where federal courts took jurisdiction over a matter originally filed in state court based on diversity of citizenship, what must be proved for the federal court to send the matter back to state courts?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Certain matters can be heard by a federal court even though they do not independently meet federal court subject matter jurisdiction requirements. What is this called?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "When the federal court has jurisdiction based on a federal question, what is the standard for whether an additional non-federal claim may be heard by the federal court?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "When the federal court has jurisdiction based on diversity, what 3 types of additional matters may be decided by the federal court without independently meeting the requirements of diversity jurisdiction?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is a compulsory counterclaim?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is the relationship of compulsory counterclaims to res judicata?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is a crossclaim?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Is a crossclaim ever compulsory?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What does compulsory mean in the context of compulsory counterclaims?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is impleader? Name 3 matters that are within the definition of impleader.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "If D joins a new party as a defendant, claiming that the matter cannot be fully adjudicated without the new party’s presence, what is that theory of joinder called and is it granted supplemental jurisdiction?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What must be proved to show that the new party D seeks to join is necessary (2 requirements)?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "If D is able to prove that the new party is necessary, what must the court do? What if the court can’t do that?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What 4 factors does the court use to determine the appropriate course of action if the party D seeks to join is necessary but can’t be joined?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "If D seeks to join a new party as defendant, he may be doing so under one of two theories, name both. Are either of them granted supplemental jurisdiction?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is personal jurisdiction traditionally based on?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Under long arm statutes, the jurisdiction of the courts has been extended. Name 5 theories that permit a court to exercise jurisdiction over a party.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Even after a theory of long arm jurisdiction is found, there are 3 other requirements in order to establish personal jurisdiction based on a long arm statute. Name all 3.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Even though a court has both personal and subject matter jurisdiction, the defendant may move to change courts. What is this theory and what 3 places are proper?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Even where there is personal jurisdiction and proper venue, there may be a better court location to hear the matter. What is this called and what 8 factors will the court look at to determine if there’s a more convenient court?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "To what type of suit does the Erie doctrine apply?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What does the Erie case actually say?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What 2 situations under Erie are clear as to the law to be applied?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Where there is a conflict between a federal rule and a state policy, what 2 things does the court ask?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "If there is no federal rule and no state statute, what are the 2 things the court balances?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is one issue in which the state interest is found to be strong such that state law, even though not substantive, is applied?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Name 3 kinds of matters, that is, claims or joinders, that use the same type of transaction or occurrence.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "In addition to the same transaction or occurrence, what is another requirement for permissive joinder?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Aside from including Latin words, what do res judicata and collateral estoppel have in common?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is different about res judicata and collateral estoppel?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is the test for res judicata? (3 requirements)",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Name 2 types of matters addressed by res judicata.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is the test for collateral estoppel? (3 requirements)",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "When the plaintiff seeks to assert collateral estoppel against the defendant, what is that called and what are the 5 factors the court uses to decide whether to permit its use?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What term describes the privilege afforded to attorney work product? Under what circumstances can the opponent discover work product? (2 requirements must be shown)",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "When is attorney work product absolutely privileged?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "When is there a right to jury in a civil case?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What does a motion for summary judgment represent? What is the motion based on and when is it made?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is the standard for motion for judgment as a matter of law? When is it made?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "What is the standard for a motion for a new trial?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
       }
     ],
     "answer": [
       {
-        "text": "1. Personal",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
-      },
-      {
-        "text": "2. Subject matter",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
+        "text": "1. Personal\n2. Subject matter",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
       },
       {
         "text": "Subject matter jurisdiction relates only to federal courts. State courts are courts of general jurisdiction. There are no subject matter limitations to state court jurisdiction.",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "1.\tDiversity\n2.\tFederal question",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Federal question jurisdiction is based on a suit involving:\n1.\tThe US Constitution\n2.\tA federal treaty\n3.\tA federal statute",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "1.\tComplete diversity of citizenship between Ps and Ds. No D can reside in the same state as any P\n2.\tAmount in controversy of more than $75,000 dollars",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Removal",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "D must prove that the matter as it stands now, with any added claims or parties, could have been filed originally in federal court, that is, that federal courts had original subject matter jurisdiction.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "1.\tAll Ds must join in the motion to remove\n2.\tNo D must reside in the state of the state court that now has jurisdiction",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Remand",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "P must prove there remains no substantial federal question in the suit, where there had been a federal question issue to resolve. The federal court may retain the suit at its discretion. It is not mandatory that the federal court remand the case.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "That the requirements for diversity jurisdiction are not present, that is, either because (1) diversity was achieved collusively or (2) the amount in controversy is not actually met. Remand is mandatory where the federal court never had jurisdiction over the matter.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Supplemental jurisdiction (formerly ancillary and pendant)",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "The federal court may hear any closely related state matter. The standard is whether it derives from a common nucleus of operative fact.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "1.\tCompulsory counterclaims\n2.\tCrossclaims\n3.\tImpleader",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "A compulsory counterclaim is a claim by the opposing party that must be raised in the same suit. If it is not raised, it is forever lost.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "The relationship between compulsory counterclaims and res judicata is that if a claim is not raised it is lost if not raised in the same suit. It is lost because it is barred by res judicata, so res judicata is a theory that will bar later adjudication of a compulsory counterclaim.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "A crossclaim is a claim against a co-party as opposed to an opposing party. For example, defendant 1 files a crossclaim against defendant 2.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "A crossclaim is never compulsory.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Compulsory means that it must be brought or is forever lost. The reason the claim must be raised is that it arises out of the same transaction or occurrence.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Impleader is joinder by D of another D, on the theory that the person joined is or may be liable to the original D for all or part of any judgment he may be awarded against the original D. \n\n3 types of matters that fall under the impleader theory are:\n1.\tProduct liability suits: Where D joins another D who is in the retail chain\n2.\tSubrogation: Where D joins his insurance company claiming he is covered by insurance and that the claim falls within the insurance company’s obligation to pay\n3.\tIndemnification: Where D and the party D joined have a contractual relationship obligating the newly joined party to reimburse D for liability, as where P sues the employer for tortious acts of the employee and the employee is obligated to reimburse the employer the amount P recovers.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "It is called necessary and indispensable party. It is not granted supplemental jurisdiction.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "1.\tComplete relief cannot be granted to the parties before the court in the absence of the necessary party; or\n2.\tIn the absence of the necessary party, the existing parties would be subject to multiple or inconsistent obligations",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "The court must join the necessary party, if possible. If the party is not subject to the court’s reach, that is, service, or joinder of the party would destroy the court’s diversity jurisdiction, then the court must decide whether it must dismiss the entire matter.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "The court uses 4 factors to determine whether it must dismiss the entire matter or whether it can shape or limit relief: \n1.\tExtent of prejudice to existing parties if suit is retained\n2.\tAbility to frame or limit the court’s relief \n3.\tAdequacy of the remedy the court can grant in the absence of the necessary party\n4.\tAbility of P to get an adequate remedy if the action is dismissed, such as, has the statute of limitations run? Can P sue D in state court and gain jurisdiction over him?",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "D may be joining a new D under the theory of necessary party or under the theory of impleader. Impleader does carry with it supplemental jurisdiction. Necessary party does not.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "PC\nPresence in the forum state; or\nConsent",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "PPIC\n1.\tPurposeful availment, that is, acts directed at the forum state such as products and services at the forum state\n2.\tPlacing products in the stream of commerce such that it is reasonably likely that it will reach the forum state\n3.\tState Interest such as committing a tort in another state the consequences of which are suffered in the forum state \n4.\tImplied Consent such as use of state highways \n5.\tContract has substantial relation to the forum state",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Personal jurisdiction requires [BRO]:\n1.\tBasis: A basis for jurisdiction. We saw PPIC –  purposeful, placing, implied, state interest, or contract\n2.\tRelatedness: That the subject matter of the suit arises out of the basis for jurisdiction, that is, the relatedness requirement. If it does not, that the party who is sought to be joined had systematic and continuous contacts with the forum \n3.\tOuter Limits: That it does not offend notions of fairness for the court to hail this D into court (Asahi)",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Venue. Venue is the logical relationship between the parties and subject matter in the place of trial. \n\nVenue is proper in 3 scenarios where:\n1.\tD resides if all Ds are citizens of the same state\n2.\tWhere the events in the suit occurred\n3.\tWhere any D is subject to personal jurisdiction",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Forum non conveniens, and it is based on 8 factors [LAC BIL]:\n1.\tLocation of the witnesses and evidence\n2.\tAbility of court to compel attendance of witnesses \n3.\tAbility of jury to view scene\n4.\tCost to the parties to compel witnesses’ attendance\n5.\tConvenience of parties\n6.\tBurden on the court (backlog, jury duty)\n7.\tInterest of the state in providing a forum\n8.\tFamiliarity of the court with the law to be applied",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "The Erie doctrine applies to suits in federal court based on diversity of citizenship.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "The Erie case actually said when a suit is in federal court based on diversity of citizenship the court should apply state substantive law and federal rules of procedure.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Where there is a state substantive law, apply state law. Where there is a federal rule governing procedure that is directly on point, apply the federal rule.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "1.\tIs the federal rule directly on point?\n2.\tDoes the federal rule enlarge, abridge or modify a state substantive right?\n\nIf yes to 1 and no to 2, apply the federal rule. No federal rule has ever been found to enlarge, abridge or modify a state substantive right. However, courts have held that the federal rule in question was not directly on point and have refused to apply the federal rule on that basis.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "If there is no federal rule and no state statute, the court engages in a rough balancing:\n1.\tIf there is a strong federal policy and a weak state interest, the court applies the federal policy. Note that the twin policies of Erie – to prevent forum shopping and to prevent prejudice against out of state litigants – will always be present and will always provide a strong federal interest.\n2.\tIf a state substantive right is only incidentally affected and the federal rule of civil procedure is reasonably necessary to maintain the integrity of the federal court system, the federal rule is applied.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "State statute of limitations.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Same transaction or occurrence is used for:\n1.\tCompulsory counterclaim\n2.\tCrossclaims \n3.\tPermissive joinder of parties",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Permissive joinder requires same transaction or occurrence AND requires common question of law or fact.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Both deal with the effect of a prior adjudication on the current suit and that is to have a “one suit, one judgment” rule to prevent parties from getting 2 bites at the apple.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Res judicata bars relitigation of an entire suit. Collateral estoppel prevents relitigation of an issue in a suit that has been previously determined.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "1.\tIdentity of parties\n2.\tMatter was adjudicated or should have been adjudicated in the prior suit\n3.\tFinal judgment on the merits",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Res judicata addresses: \n1.\tClaim-splitting, that is, damages which are considered merged even though not claimed in a previous suit arising out of the same transaction or occurrence; and\n2.\tCompulsory counterclaims that are matters which should have been adjudicated but weren’t and are now barred. \n\nTo sum: Res judicata covers merger for damages and bar of compulsory counterclaims.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Collateral estoppel 3 requirements:\n1.\tThe party against whom it is asserted was a party in the 1st action\n2.\tSame issue of law or fact\n3.\tThe issue was actually litigated and necessary to the 1st judgment",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "It is called offensive use of collateral estoppel or collateral estoppel as a sword. The court uses 5 factors to determine whether to permit the plaintiff to assert it:\n1.\tWas the defendant a defendant in the 1st action? If so, P never voluntarily came into court, operates against allowing its use.\n2.\tDid he know about the 1st suit against him and deliberately sit it out waiting to see who won? This operates against its use.\n3.\tIs it a matter for the jury? Courts like to let juries find matters within their domain afresh. This cuts against use of collateral estoppel as a sword.  \n4.\tSimilarly, is it a question of fact? Courts want the factfinder to determine questions of fact rather than being foreclosed from them by a previous judgment. This cuts against the use of collateral estoppel as a sword.\n5.\tDid defendant have the same incentive to fully litigate in the 1st action? If he did, then this would permit collateral estoppel to be used against him.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Attorney work product is a qualified privileged. It can be discovered where:\n1.\tIt is unobtainable elsewhere without undue expense\n2.\tParty seeking discovery has a substantial need for the information",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Attorney work product is absolutely privileged if it contains the mental impressions, conclusions, opinions, or legal theories of an attorney.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "There is a right to a jury trial where there are legal issues, i.e., claims for damages.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Motion for summary judgment states that there is no genuine issue of material fact or, taking the facts in the light most favorable to the nonmoving party, the movant is entitled to judgment as a matter of law. It is based on the pleadings, results of discovery, and affidavits. It is generally made pretrial.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Motion for judgment as a matter of law (JMOL) states that, considering all the evidence in the light most favorable to the nonmoving party, reasonable persons could not disagree about the verdict. It is made at the close of plaintiff’s case or at the close of all evidence.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
+      },
+      {
+        "text": "Motion for a new trial is granted if the verdict was against the weight of the evidence, excessive, or seriously erroneous.",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
       }
     ],
     "ignore": [
       {
-        "text": "JW Bar Method CA Bar Essay Quizzes",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
+        "text": "JW Bar Method \nCA Bar Essay Quizzes",
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
       },
       {
         "text": "CIVIL PROCEDURE (50 questions)",
-        "source": "document",
-        "timestamp": "2025-04-12T12:00:00.000000"
+        "source": "initial",
+        "timestamp": "2023-10-27T00:00:00.000000"
       }
     ]
   }

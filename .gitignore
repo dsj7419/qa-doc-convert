@@ -36,8 +36,8 @@ Thumbs.db
 # repomix
 *repomix*
 
-#logs
+# logs
 *.log
 
-#docs
+# docs
 Technical Refactoring.docx
