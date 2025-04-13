@@ -32,10 +32,8 @@ class HeaderPanel(ttk.Frame):
     def _init_ui(self):
         """Initialize UI elements."""
         # Configure grid
-        self.columnconfigure(0, weight=0)  # Logo/title
-        self.columnconfigure(1, weight=1)  # Spacer
-        self.columnconfigure(2, weight=0)  # Load button
-        self.columnconfigure(3, weight=0)  # Save button
+        self.columnconfigure(0, weight=1)  # Logo/title - expands
+        self.columnconfigure(1, weight=0)  # Button area - fixed width
         
         # Create header container with padding
         title_container = ttk.Frame(self, style='Header.TFrame')
@@ -46,7 +44,8 @@ class HeaderPanel(ttk.Frame):
             title_container,
             text="QA",
             style='Header.TLabel',
-            font=("Segoe UI", 18, "bold")
+            font=("Segoe UI", 18, "bold"),
+            foreground=AppTheme.COLORS['header_fg']
         )
         icon_label.pack(side=tk.LEFT, padx=(0, 10))
         
@@ -55,13 +54,14 @@ class HeaderPanel(ttk.Frame):
             title_container,
             text="Verifier Professional",
             style='Header.TLabel',
-            font=AppTheme.FONTS['title']
+            font=AppTheme.FONTS['title'],
+            foreground=AppTheme.COLORS['header_fg']
         )
         title_label.pack(side=tk.LEFT)
         
         # Buttons Frame (right-aligned)
         buttons_frame = ttk.Frame(self, style='Header.TFrame')
-        buttons_frame.grid(row=0, column=2, columnspan=2, sticky="e")
+        buttons_frame.grid(row=0, column=1, sticky="e")
         
         # Load Button
         self.load_btn = ttk.Button(
@@ -79,7 +79,7 @@ class HeaderPanel(ttk.Frame):
             text="Save Corrected CSV",
             command=self._on_save_click,
             style='Primary.TButton',
-            width=20
+            width=18
         )
         self.save_btn.pack(side=tk.LEFT)
     

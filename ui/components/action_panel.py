@@ -41,206 +41,189 @@ class ActionPanel(ttk.Frame):
     
     def _init_ui(self):
         """Initialize UI elements."""
-        # Create title frame
-        title_frame = ttk.Frame(self, style='TFrame')
-        title_frame.pack(fill=tk.X, padx=5, pady=(0, 10))
+        # CRITICAL SIMPLIFICATION - remove scrolling and use simpler layout
+        # Configure panel for proper resizing
+        self.pack_propagate(False)  # Don't shrink the frame to fit its contents
         
-        # Title label with background
-        title_bg = ttk.Frame(title_frame, style='Header.TFrame')
-        title_bg.pack(fill=tk.X)
+        # Title header
+        header_frame = ttk.Frame(self, style='Header.TFrame')
+        header_frame.pack(fill=tk.X)
         
-        title_label = ttk.Label(
-            title_bg,
-            text="Actions for Selected:",
+        header_label = ttk.Label(
+            header_frame,
+            text="Actions for Selected",
             style='Header.TLabel',
-            font=AppTheme.FONTS['bold']
+            font=AppTheme.FONTS['title'],
+            padding=(10, 5)
         )
-        title_label.pack(anchor="w", fill=tk.X, padx=5, pady=5)
+        header_label.pack(anchor="w", fill=tk.X)
         
-        # Create container for action buttons
-        actions_container = ttk.Frame(self, style='TFrame', padding=(3, 5, 3, 5))
-        actions_container.pack(fill=tk.X, padx=3, pady=2)
+        # Main content area - simple frame with padding
+        content_frame = ttk.Frame(self, style='TFrame', padding=10)
+        content_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Action buttons
+        # PRIMARY ACTION BUTTONS
+        # Question button
         self.btn_question = ttk.Button(
-            actions_container,
+            content_frame,
             text="Mark as QUESTION",
             command=self._on_mark_question,
             style='Action.TButton',
             width=20
         )
-        self.btn_question.pack(pady=2, fill=tk.X)
+        self.btn_question.pack(pady=(0, 5), fill=tk.X)
         
+        # Answer button
         self.btn_answer = ttk.Button(
-            actions_container,
+            content_frame,
             text="Mark as ANSWER",
             command=self._on_mark_answer,
             style='Action.TButton',
             width=20
         )
-        self.btn_answer.pack(pady=2, fill=tk.X)
+        self.btn_answer.pack(pady=5, fill=tk.X)
         
+        # Ignore button
         self.btn_ignore = ttk.Button(
-            actions_container,
+            content_frame,
             text="Mark as IGNORE",
             command=self._on_mark_ignore,
             style='Action.TButton',
             width=20
         )
-        self.btn_ignore.pack(pady=2, fill=tk.X)
+        self.btn_ignore.pack(pady=5, fill=tk.X)
         
-        ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
-        
-        # Create a separate container for merge action
-        merge_container = ttk.Frame(self, style='TFrame', padding=(3, 2, 3, 2))
-        merge_container.pack(fill=tk.X, padx=3, pady=2)
+        # Separator
+        ttk.Separator(content_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
         
         # Merge button
         self.btn_merge_up = ttk.Button(
-            merge_container,
+            content_frame,
             text="Add to Previous Answer",
             command=self._on_merge_up,
             style='Action.TButton',
             width=20
         )
-        self.btn_merge_up.pack(pady=2, fill=tk.X)
+        self.btn_merge_up.pack(pady=5, fill=tk.X)
         
-        # Add a small tooltip label to explain the functionality
-        merge_tooltip = ttk.Label(
-            merge_container,
+        # Tooltip text
+        tooltip = ttk.Label(
+            content_frame,
             text="(For multi-paragraph answers)",
-            font=("Segoe UI" if AppTheme.FONTS['normal'] is None else AppTheme.FONTS['normal'][0], 7)
+            foreground=AppTheme.COLORS['text_secondary'],
+            font=("Segoe UI" if AppTheme.FONTS['normal'] is None else AppTheme.FONTS['normal'][0], 8)
         )
-        merge_tooltip.pack(pady=(0, 2), fill=tk.X)
+        tooltip.pack(pady=(0, 10))
         
-        # Add undo/redo container
-        undo_container = ttk.Frame(self, style='TFrame', padding=(3, 2, 3, 2))
-        undo_container.pack(fill=tk.X, padx=3, pady=2)
+        # Separator
+        ttk.Separator(content_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
         
-        # Undo/Redo buttons (side by side)
-        buttons_frame = ttk.Frame(undo_container)
-        buttons_frame.pack(fill=tk.X)
-        buttons_frame.columnconfigure(0, weight=1)
-        buttons_frame.columnconfigure(1, weight=1)
+        # Undo/Redo in a row
+        undo_frame = ttk.Frame(content_frame)
+        undo_frame.pack(fill=tk.X, pady=5)
+        undo_frame.columnconfigure(0, weight=1)
+        undo_frame.columnconfigure(1, weight=1)
         
         self.btn_undo = ttk.Button(
-            buttons_frame,
+            undo_frame,
             text="↩ Undo",
             command=self._on_undo,
-            style='Action.TButton'
+            style='TButton'
         )
         self.btn_undo.grid(row=0, column=0, sticky="ew", padx=(0, 2))
         
         self.btn_redo = ttk.Button(
-            buttons_frame,
+            undo_frame,
             text="Redo ↪",
             command=self._on_redo,
-            style='Action.TButton'
+            style='TButton'
         )
         self.btn_redo.grid(row=0, column=1, sticky="ew", padx=(2, 0))
         
-        ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
+        # Separator
+        ttk.Separator(content_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
         
-        # Stats container with accent background
-        stats_container = ttk.Frame(self, style='TFrame', padding=(10, 10, 10, 10))
-        stats_container.pack(fill=tk.X, padx=5, pady=5)
-        
-        # Expected Question Count Frame
-        count_frame = ttk.Frame(stats_container, style='TFrame')
-        count_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        # Expected Questions label with background
-        count_bg = ttk.Frame(count_frame, style='Header.TFrame')
-        count_bg.pack(side=tk.LEFT)
-        
+        # Expected count
         count_label = ttk.Label(
-            count_bg,
+            content_frame,
             text="Expected # of Questions:",
-            style='Header.TLabel',
             font=AppTheme.FONTS['bold']
         )
-        count_label.pack(side=tk.LEFT, padx=5, pady=3)
+        count_label.pack(anchor="w", pady=(5, 3))
+        
+        count_frame = ttk.Frame(content_frame)
+        count_frame.pack(fill=tk.X, pady=(0, 10))
         
         self.question_count_var = tk.StringVar(value="0")
         self.count_entry = ttk.Entry(
             count_frame,
             textvariable=self.question_count_var,
-            width=5,
+            width=8,
             justify=tk.CENTER
         )
-        self.count_entry.pack(side=tk.LEFT, padx=5)
+        self.count_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
         
         set_count_btn = ttk.Button(
             count_frame,
             text="Set",
             command=self._on_set_expected_count,
-            style='Small.Action.TButton',
-            width=5
+            style='TButton',
+            width=8
         )
-        set_count_btn.pack(side=tk.LEFT)
+        set_count_btn.pack(side=tk.RIGHT)
         
-        # Stats title background
-        stats_bg = ttk.Frame(stats_container, style='Header.TFrame')
-        stats_bg.pack(fill=tk.X, pady=(0, 10))
-        
-        # Info/Stats Area
+        # Statistics
         stats_label = ttk.Label(
-            stats_bg,
+            content_frame,
             text="Current Stats:",
-            style='Header.TLabel',
             font=AppTheme.FONTS['bold']
         )
-        stats_label.pack(anchor="w", fill=tk.X, padx=5, pady=5)
+        stats_label.pack(anchor="w", pady=(10, 3))
         
         self.stats_label = ttk.Label(
-            stats_container,
-            text="Questions: 0 / 0",
-            font=AppTheme.FONTS['normal']
+            content_frame,
+            text="Questions: 0 / 0"
         )
         self.stats_label.pack(anchor="w", pady=(0, 5))
         
         # Progress bar
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_bar = ttk.Progressbar(
-            stats_container,
+            content_frame,
             orient=tk.HORIZONTAL,
             length=200,
             mode='determinate',
             variable=self.progress_var
         )
-        self.progress_bar.pack(anchor="w", pady=5, fill=tk.X)
+        self.progress_bar.pack(fill=tk.X, pady=5)
         
-        # Training status label (for background training feedback)
-        self.training_frame = ttk.Frame(stats_container)
+        # Training status 
+        self.training_frame = ttk.Frame(content_frame)
         self.training_frame.pack(fill=tk.X, pady=5)
         
         self.training_status_var = tk.StringVar(value="")
         self.training_status = ttk.Label(
             self.training_frame,
             textvariable=self.training_status_var,
-            font=AppTheme.FONTS['normal'],
-            foreground=AppTheme.COLORS['accent']
+            foreground=AppTheme.COLORS['accent'],
+            wraplength=220
         )
-        self.training_status.pack(anchor="w", fill=tk.X)
+        self.training_status.pack(fill=tk.X)
         
         # Initially hide training status
         self.training_frame.pack_forget()
         
-        # Exit button at bottom
-        ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
-        
-        # Create a button container for the exit button
-        exit_container = ttk.Frame(self, style='TFrame', padding=(3, 2, 3, 2))
-        exit_container.pack(fill=tk.X, padx=3, pady=2, side=tk.BOTTOM)
+        # Exit button - at the bottom
+        exit_frame = ttk.Frame(content_frame)
+        exit_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(10, 0))
         
         exit_btn = ttk.Button(
-            exit_container,
+            exit_frame,
             text="Exit Application",
             command=self._on_exit,
-            style='Danger.TButton',
-            width=15
+            style='Danger.TButton'
         )
-        exit_btn.pack(pady=0, side=tk.RIGHT)
+        exit_btn.pack(side=tk.RIGHT)
         
         # Initially disable action buttons
         self._update_button_states(False)
@@ -306,7 +289,7 @@ class ActionPanel(ttk.Frame):
             else:
                 color = AppTheme.COLORS['danger']
         else:
-            color = AppTheme.COLORS['dark']
+            color = AppTheme.COLORS['text']
         
         # Update stats text
         status = f"Questions: {question_count} / {expected_count}"
@@ -352,7 +335,7 @@ class ActionPanel(ttk.Frame):
         """Reset the panel state."""
         self.question_count_var.set("0")
         self.progress_var.set(0)
-        self.stats_label.config(text="Questions: 0 / 0")
+        self.stats_label.config(text="Questions: 0 / 0", foreground=AppTheme.COLORS['text'])
         self._update_button_states(False)
         self.update_undo_redo_state(False, False)
         self.update_training_status(None)

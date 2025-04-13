@@ -26,44 +26,30 @@ class LogPanel(ttk.Frame):
     def _init_ui(self):
         """Initialize UI elements."""
         # Log header
-        header_container = ttk.Frame(self, style='TFrame')
-        header_container.pack(fill=tk.X, padx=5, pady=(0, 5))
-        
-        # Header with background
-        header_bg = ttk.Frame(header_container, style='Header.TFrame')
-        header_bg.pack(fill=tk.X, expand=True)
-        
-        # Create header content with icon and text
-        header_content = ttk.Frame(header_bg, style='Header.TFrame')
-        header_content.pack(fill=tk.X, padx=5, pady=3)
-        
-        # Log icon (clipboard emoji)
-        log_icon = ttk.Label(
-            header_content,
-            text="📋",
-            style='Header.TLabel',
-            font=("Segoe UI", 12)
-        )
-        log_icon.pack(side=tk.LEFT, padx=(0, 8))
+        header_frame = ttk.Frame(self, style='Header.TFrame')
+        header_frame.pack(fill=tk.X)
         
         header_label = ttk.Label(
-            header_content,
-            text="Log:",
+            header_frame,
+            text="Application Log",
             style='Header.TLabel',
-            font=AppTheme.FONTS['bold']
+            font=AppTheme.FONTS['title'],
+            foreground=AppTheme.COLORS['header_fg'],
+            padding=(10, 5)
         )
-        header_label.pack(side=tk.LEFT)
+        header_label.pack(anchor="w", fill=tk.X)
         
         # Container frame for log with border
         log_container = ttk.Frame(self, style='TFrame')
-        log_container.pack(fill=tk.X, padx=5, pady=0)
+        log_container.pack(fill=tk.X, padx=5, pady=5)
         
         # Log text widget - reduced height
         self.log_text = scrolledtext.ScrolledText(
             log_container,
-            height=4,
+            height=5,
             font=AppTheme.FONTS['log'],
-            bg="white",
+            bg=AppTheme.COLORS['input_bg'],
+            fg=AppTheme.COLORS['text'],
             relief=tk.SUNKEN,
             bd=1,
             wrap=tk.WORD,
@@ -85,10 +71,19 @@ class LogPanel(ttk.Frame):
             button_container,
             text="Clear Log",
             command=self._clear_log,
-            style='Action.TButton',
+            style='TButton',
             width=10
         )
         clear_btn.pack(side=tk.RIGHT, pady=(5, 0))
+        
+        # Configure log message tags
+        self._configure_tags()
+    
+    def _configure_tags(self):
+        """Configure text tags for different log levels."""
+        self.log_text.tag_configure("INFO", foreground=AppTheme.COLORS['text'])
+        self.log_text.tag_configure("WARNING", foreground=AppTheme.COLORS['warning'])
+        self.log_text.tag_configure("ERROR", foreground=AppTheme.COLORS['danger'])
     
     def log_message(self, message, level="INFO"):
         """
@@ -105,27 +100,12 @@ class LogPanel(ttk.Frame):
             logger.warning(message)
         else:
             logger.info(message)
-            
-        # Define color based on level
-        if level == "ERROR":
-            tag = "error"
-            color = AppTheme.COLORS['danger']
-        elif level == "WARNING":
-            tag = "warning"
-            color = AppTheme.COLORS['warning']
-        else:
-            tag = "info"
-            color = AppTheme.COLORS['dark']
         
         # Update UI log
         self.log_text.config(state=tk.NORMAL)
         
-        # Add tags if they don't exist
-        if tag not in self.log_text.tag_names():
-            self.log_text.tag_configure(tag, foreground=color)
-        
         # Insert message with timestamp and tag
-        self.log_text.insert(tk.END, f"{level}: {message}\n", tag)
+        self.log_text.insert(tk.END, f"{level}: {message}\n", level)
         self.log_text.see(tk.END)
         self.log_text.config(state=tk.DISABLED)
         

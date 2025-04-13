@@ -22,16 +22,17 @@ class StatusBar(ttk.Frame):
     
     def _init_ui(self):
         """Initialize UI elements."""
-        # Create container with border and gradient effect
-        status_container = ttk.Frame(self, style='TFrame')
+        # Create container with border
+        status_container = ttk.Frame(self, style='Section.TFrame')
         status_container.pack(fill=tk.X, padx=5, expand=True)
         
-        # Status icon (information icon)
+        # Status icon
         status_icon = ttk.Label(
             status_container,
             text="ℹ",  # Unicode info symbol
             font=("Segoe UI", 10, "bold"),
-            foreground=AppTheme.COLORS['accent']
+            foreground=AppTheme.COLORS['accent'],
+            background=AppTheme.COLORS['section_header_bg']
         )
         status_icon.pack(side=tk.LEFT, padx=(5, 10))
         
@@ -43,6 +44,8 @@ class StatusBar(ttk.Frame):
             status_container,
             textvariable=self.status_var,
             font=AppTheme.FONTS['normal'],
+            foreground=AppTheme.COLORS['text'],
+            background=AppTheme.COLORS['section_header_bg'],
             anchor=tk.W,
             padding=(0, 5)
         )
@@ -56,4 +59,4 @@ class StatusBar(ttk.Frame):
             message: Status message to display
         """
         self.status_var.set(message)
-        self.update_idletasks()  # Force update
+        self.update_idletasks()  # Force update5

@@ -23,99 +23,83 @@ class ParagraphList(ttk.Frame):
         self.paragraphs = []
         self.selection_callback = None
         self.current_selection_index = -1
+        self.displayed_paragraphs = []  # Track which paragraphs are currently displayed
         
         self._init_ui()
     
     def _init_ui(self):
         """Initialize UI elements."""
         # Configure grid
-        self.rowconfigure(0, weight=0)  # Header
-        self.rowconfigure(1, weight=0)  # Filter
-        self.rowconfigure(2, weight=1)  # Listbox
-        self.rowconfigure(3, weight=0)  # Horizontal scrollbar
-        self.columnconfigure(0, weight=1)  # Main content
-        self.columnconfigure(1, weight=0)  # Vertical scrollbar
+        self.rowconfigure(0, weight=0)  # Header - fixed
+        self.rowconfigure(1, weight=0)  # Filter - fixed
+        self.rowconfigure(2, weight=1)  # Listbox - expandable
+        self.rowconfigure(3, weight=0)  # Horizontal scrollbar - fixed
+        self.rowconfigure(4, weight=0)  # Legend - fixed
+        self.columnconfigure(0, weight=1)  # Main content - expandable
+        self.columnconfigure(1, weight=0)  # Vertical scrollbar - fixed
         
         # Document Paragraphs header
-        header_container = ttk.Frame(self, style='TFrame')
-        header_container.grid(row=0, column=0, sticky="ew", pady=(0, 5))
-        
-        # Header with background
-        header_bg = ttk.Frame(header_container, style='Header.TFrame')
-        header_bg.pack(fill=tk.X, expand=True)
-        
-        # Create header content with icon and text
-        header_content = ttk.Frame(header_bg, style='Header.TFrame')
-        header_content.pack(fill=tk.X, padx=5, pady=3)
-        
-        # Document icon
-        doc_icon = ttk.Label(
-            header_content,
-            text="📄",  # Document emoji
-            style='Header.TLabel',
-            font=("Segoe UI", 12)
-        )
-        doc_icon.pack(side=tk.LEFT, padx=(0, 8))
+        header_frame = ttk.Frame(self, style='Header.TFrame')
+        header_frame.grid(row=0, column=0, columnspan=2, sticky="ew")
         
         header_label = ttk.Label(
-            header_content,
-            text="Document Paragraphs:",
+            header_frame,
+            text="Document Paragraphs",
             style='Header.TLabel',
-            font=AppTheme.FONTS['bold']
+            font=AppTheme.FONTS['title'],
+            foreground=AppTheme.COLORS['header_fg'],
+            padding=(10, 8)
         )
-        header_label.pack(side=tk.LEFT)
+        header_label.pack(anchor="w", fill=tk.X)
         
-        # Filter frame
-        filter_frame = ttk.Frame(self, style='TFrame')
-        filter_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        # Filter container
+        filter_container = ttk.Frame(self, style='Section.TFrame')
+        filter_container.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 5))
         
-        # Filter label with background
-        filter_bg = ttk.Frame(filter_frame, style='Header.TFrame')
-        filter_bg.pack(side=tk.LEFT, padx=(0, 8))
-        
+        # Filter label
         filter_label = ttk.Label(
-            filter_bg,
+            filter_container,
             text="Filter:",
-            style='Header.TLabel',
-            font=AppTheme.FONTS['bold']
+            style='Section.TLabel',
+            padding=(10, 5)
         )
-        filter_label.pack(side=tk.LEFT, padx=5, pady=3)
+        filter_label.pack(side=tk.LEFT)
         
         self.filter_var = tk.StringVar()
         self.filter_var.trace("w", self._on_filter_change)
         
-        # Enhanced entry field
+        # Filter entry field
         filter_entry = ttk.Entry(
-            filter_frame,
+            filter_container,
             textvariable=self.filter_var,
-            width=20
+            width=30
         )
-        filter_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        filter_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
         # Clear button
         clear_btn = ttk.Button(
-            filter_frame,
+            filter_container,
             text="Clear",
             command=self._clear_filter,
-            style='Action.TButton',
+            style='TButton',
             width=8
         )
-        clear_btn.pack(side=tk.LEFT, padx=(8, 0))
+        clear_btn.pack(side=tk.LEFT, padx=(5, 10))
         
-        # Listbox with custom styling - improved design
+        # Listbox with custom styling - CRITICAL FIX: updated selection colors
         self.listbox = tk.Listbox(
             self,
             font=AppTheme.FONTS['list'],
             bg=AppTheme.COLORS['list_bg'],
+            fg=AppTheme.COLORS['list_fg'],
             selectbackground=AppTheme.COLORS['list_selected_bg'],
-            selectforeground=AppTheme.COLORS['list_selected_fg'],
+            selectforeground=AppTheme.COLORS['text'],  # CRITICAL FIX: Keep text color visible on selection
             borderwidth=1,
             relief=tk.SUNKEN,
-            exportselection=False,
-            activestyle='none',
             highlightthickness=1,
             highlightbackground=AppTheme.COLORS['list_border'],
-            highlightcolor=AppTheme.COLORS['accent'],
+            activestyle='none',
+            exportselection=False,
             selectmode=tk.EXTENDED  # Allow multiple selection
         )
         self.listbox.grid(row=2, column=0, sticky="nsew")
@@ -137,12 +121,48 @@ class ParagraphList(ttk.Frame):
         x_scrollbar.grid(row=3, column=0, sticky="ew")
         self.listbox.config(xscrollcommand=x_scrollbar.set)
         
+        # Create legend for paragraph roles
+        legend_frame = ttk.Frame(self, style='TFrame', padding=5)
+        legend_frame.grid(row=4, column=0, columnspan=2, sticky="ew")
+        
+        # Title for legend
+        legend_title = ttk.Label(
+            legend_frame,
+            text="Role Legend:",
+            font=AppTheme.FONTS['bold']
+        )
+        legend_title.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Create color swatches for each role
+        self._create_legend_item(legend_frame, "Question", AppTheme.COLORS['role_question_bg'], AppTheme.COLORS['role_question_fg'])
+        self._create_legend_item(legend_frame, "Answer", AppTheme.COLORS['role_answer_bg'], AppTheme.COLORS['role_answer_fg'])
+        self._create_legend_item(legend_frame, "Ignore", AppTheme.COLORS['role_ignore_bg'], AppTheme.COLORS['role_ignore_fg'])
+        self._create_legend_item(legend_frame, "Undetermined", AppTheme.COLORS['role_undetermined_bg'], AppTheme.COLORS['role_undetermined_fg'])
+        
         # Bind selection event
         self.listbox.bind('<<ListboxSelect>>', self._on_selection_change)
+    
+    def _create_legend_item(self, parent, text, bg_color, fg_color):
+        """Create a legend item with color swatch and text."""
+        item_frame = ttk.Frame(parent)
+        item_frame.pack(side=tk.LEFT, padx=10)
         
-        # Add keyboard shortcuts for Undo/Redo
-        self.bind_all("<Control-z>", self._on_ctrl_z)
-        self.bind_all("<Control-y>", self._on_ctrl_y)
+        # Color swatch
+        swatch = tk.Label(
+            item_frame, 
+            bg=bg_color, 
+            width=3, 
+            height=1
+        )
+        swatch.pack(side=tk.LEFT, padx=(0, 3))
+        
+        # Text label
+        label = ttk.Label(
+            item_frame,
+            text=text,
+            foreground=fg_color
+        )
+        label.pack(side=tk.LEFT)
     
     def set_paragraphs(self, paragraphs: List[Paragraph]):
         """
@@ -160,8 +180,9 @@ class ParagraphList(ttk.Frame):
         selected_indices = self.listbox.curselection()
         selected_idx = selected_indices[0] if selected_indices else -1
         
-        # Clear listbox
+        # Clear listbox and tracking
         self.listbox.delete(0, tk.END)
+        self.displayed_paragraphs = []
         
         # Get filter text
         filter_text = self.filter_var.get().lower()
@@ -172,19 +193,29 @@ class ParagraphList(ttk.Frame):
                 # Add paragraph to listbox
                 self.listbox.insert(tk.END, para.display_text)
                 
-                # Set background color based on role
+                # Add to displayed paragraphs tracking
+                self.displayed_paragraphs.append(i)
+                
+                # CRITICAL FIX: Store original colors
+                # Set background and foreground colors based on role
                 if para.role == ParaRole.QUESTION:
                     bg_color = AppTheme.COLORS['role_question_bg']
-                    self.listbox.itemconfig(self.listbox.size()-1, {'bg': bg_color})
+                    fg_color = AppTheme.COLORS['role_question_fg']
                 elif para.role == ParaRole.ANSWER:
                     bg_color = AppTheme.COLORS['role_answer_bg']
-                    self.listbox.itemconfig(self.listbox.size()-1, {'bg': bg_color})
+                    fg_color = AppTheme.COLORS['role_answer_fg']
                 elif para.role == ParaRole.IGNORE:
                     bg_color = AppTheme.COLORS['role_ignore_bg']
-                    self.listbox.itemconfig(self.listbox.size()-1, {'bg': bg_color})
+                    fg_color = AppTheme.COLORS['role_ignore_fg']
                 else:  # UNDETERMINED
                     bg_color = AppTheme.COLORS['role_undetermined_bg']
-                    self.listbox.itemconfig(self.listbox.size()-1, {'bg': bg_color})
+                    fg_color = AppTheme.COLORS['role_undetermined_fg']
+                
+                # Configure item appearance
+                self.listbox.itemconfig(
+                    len(self.displayed_paragraphs) - 1, 
+                    {'bg': bg_color, 'fg': fg_color}
+                )
         
         # Try to restore selection
         if selected_idx >= 0 and selected_idx < self.listbox.size():
@@ -216,20 +247,6 @@ class ParagraphList(ttk.Frame):
         if callable(self.selection_callback):
             self.selection_callback()
     
-    def _on_ctrl_z(self, event):
-        """Handle Ctrl+Z keyboard shortcut."""
-        # Find the parent window
-        parent = self.winfo_toplevel()
-        if hasattr(parent, 'event_generate'):
-            parent.event_generate("<<Undo>>")
-    
-    def _on_ctrl_y(self, event):
-        """Handle Ctrl+Y keyboard shortcut."""
-        # Find the parent window
-        parent = self.winfo_toplevel()
-        if hasattr(parent, 'event_generate'):
-            parent.event_generate("<<Redo>>")
-    
     def set_selection_callback(self, callback: Callable[[], None]):
         """
         Set the callback for selection changes.
@@ -244,13 +261,22 @@ class ParagraphList(ttk.Frame):
         Get the indices of selected paragraphs.
         
         Returns:
-            Set of selected indices
+            Set of selected indices in the original paragraphs list
         """
-        return set(self.listbox.curselection())
+        # Convert listbox indices to original paragraph indices
+        listbox_indices = set(self.listbox.curselection())
+        original_indices = set()
+        
+        for idx in listbox_indices:
+            if 0 <= idx < len(self.displayed_paragraphs):
+                original_indices.add(self.displayed_paragraphs[idx])
+        
+        return original_indices
     
     def clear(self):
         """Clear the listbox and reset state."""
         self.paragraphs = []
+        self.displayed_paragraphs = []
         self.listbox.delete(0, tk.END)
         self.filter_var.set("")
         self.current_selection_index = -1

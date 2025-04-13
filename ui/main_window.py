@@ -29,8 +29,8 @@ class MainWindow(IMainWindowView, IParagraphListView):
         """
         self.root = root
         self.root.title("QA Verifier - Professional Edition")
-        self.root.geometry("1100x750")
-        self.root.minsize(900, 650)
+        self.root.geometry("1200x900")  # Larger initial size
+        self.root.minsize(1000, 900)    # Increased minimum window size
         
         # Configure theme
         self.root.configure(bg=AppTheme.COLORS['bg'])
@@ -56,17 +56,17 @@ class MainWindow(IMainWindowView, IParagraphListView):
     
     def _build_ui(self):
         """Build the main UI structure."""
-        # Configure grid layout
-        self.root.columnconfigure(0, weight=1)
-        self.root.rowconfigure(0, weight=0)  # Header
-        self.root.rowconfigure(1, weight=0)  # Status bar
-        self.root.rowconfigure(2, weight=1)  # Main content
-        self.root.rowconfigure(3, weight=0)  # Log panel
+        # Configure grid layout - ensure proper expansion
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(0, weight=0)  # Header - fixed
+        self.root.grid_rowconfigure(1, weight=0)  # Status bar - fixed
+        self.root.grid_rowconfigure(2, weight=1)  # Main content - expandable
+        self.root.grid_rowconfigure(3, weight=0)  # Log panel - fixed
         
         # Apply the background color to the root window
         self.root.configure(bg=AppTheme.COLORS['bg'])
         
-        # Create a gradient frame for the header
+        # Create header panel
         self.header = HeaderPanel(
             self.root,
             on_load=self._on_load_click,
@@ -74,36 +74,45 @@ class MainWindow(IMainWindowView, IParagraphListView):
         )
         self.header.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
-        # Add debug menu
+        # Add menu system
         self.menu_bar = tk.Menu(self.root)
         self.root.config(menu=self.menu_bar)
 
         # File menu
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
-        file_menu.add_command(label="Load DOCX", command=self._on_load_click)
-        file_menu.add_command(label="Save CSV", command=self._on_save_click)
+        file_menu.add_command(label="Load DOCX", command=self._on_load_click, accelerator="Ctrl+O")
+        file_menu.add_command(label="Save CSV", command=self._on_save_click, accelerator="Ctrl+S")
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self._on_exit)
+        file_menu.add_command(label="Exit", command=self._on_exit, accelerator="Alt+F4")
 
-        # Debug menu
-        debug_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.menu_bar.add_cascade(label="Debug", menu=debug_menu)
-        debug_menu.add_command(label="Toggle Manual Training Mode", 
-                       command=self._toggle_manual_training_mode)
-        debug_menu.add_command(label="Show Training Progress", command=self._show_training_progress)
-        debug_menu.add_command(label="Show AI Training Stats", command=self._show_ai_stats)
-        debug_menu.add_command(label="View Training Examples", command=self._view_training_examples)
-        debug_menu.add_command(label="Save Training Data Now", command=self._save_training_data)
-        debug_menu.add_command(label="Collect Examples from Document", command=self._collect_examples_now)
-        debug_menu.add_command(label="Force AI Training", command=self._force_ai_training)
-        debug_menu.add_command(label="Diagnose and Fix AI Training", command=self._diagnose_ai_training)
-        debug_menu.add_command(label="Reset & Use AI Analyzer", command=self._reset_and_use_ai)
-        debug_menu.add_command(label="Reset All Training Data", command=self._reset_training_data)
-        debug_menu.add_command(label="Verify File Permissions", command=self._verify_file_permissions)
-        debug_menu.add_command(label="Open Data Directory", command=self._open_data_dir)
+        # Edit menu
+        edit_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu.add_command(label="Undo", command=self._on_undo, accelerator="Ctrl+Z")
+        edit_menu.add_command(label="Redo", command=self._on_redo, accelerator="Ctrl+Y")
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Mark as Question", command=lambda: self._on_change_role(ParaRole.QUESTION), accelerator="Ctrl+Q")
+        edit_menu.add_command(label="Mark as Answer", command=lambda: self._on_change_role(ParaRole.ANSWER), accelerator="Ctrl+A")
+        edit_menu.add_command(label="Mark as Ignore", command=lambda: self._on_change_role(ParaRole.IGNORE), accelerator="Ctrl+I")
+        edit_menu.add_command(label="Add to Previous Answer", command=self._on_merge_up, accelerator="Ctrl+M")
 
-        # Status Bar - reduced height
+        # AI Options menu
+        ai_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="AI Options", menu=ai_menu)
+        ai_menu.add_command(label="Show AI Training Stats", command=self._show_ai_stats)
+        ai_menu.add_command(label="Toggle Manual Training Mode", command=self._toggle_manual_training_mode)
+        ai_menu.add_separator()
+        ai_menu.add_command(label="Force AI Training", command=self._force_ai_training)
+        ai_menu.add_command(label="Reset & Use AI Analyzer", command=self._reset_and_use_ai)
+
+        # Help menu
+        help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.menu_bar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label="About", command=self._show_about)
+        help_menu.add_command(label="Keyboard Shortcuts", command=self._show_shortcuts)
+
+        # Status Bar
         self.status_bar = StatusBar(self.root)
         self.status_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 0))
         
@@ -111,12 +120,13 @@ class MainWindow(IMainWindowView, IParagraphListView):
         main_frame = ttk.Frame(self.root, style='TFrame')
         main_frame.grid(row=2, column=0, sticky="nsew", padx=10, pady=5)
         
-        main_frame.columnconfigure(0, weight=3)  # Paragraph list
-        main_frame.columnconfigure(1, weight=0)  # Separator
-        main_frame.columnconfigure(2, weight=1)  # Actions
-        main_frame.rowconfigure(0, weight=1)
+        # Configure main frame for proper expansion
+        main_frame.columnconfigure(0, weight=3)  # Paragraph list - expandable
+        main_frame.columnconfigure(1, weight=0)  # Separator - fixed
+        main_frame.columnconfigure(2, weight=0, minsize=270)  # Actions - fixed width
+        main_frame.rowconfigure(0, weight=1)  # Full height
         
-        # Paragraph List
+        # Paragraph List - expand to fill available space
         self.para_list = ParagraphList(main_frame)
         self.para_list.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
@@ -124,11 +134,12 @@ class MainWindow(IMainWindowView, IParagraphListView):
         sep = ttk.Separator(main_frame, orient=tk.VERTICAL)
         sep.grid(row=0, column=1, sticky="ns", padx=5)
         
-        # Action Panel - set to fixed width for better layout control
-        action_frame = ttk.Frame(main_frame, width=250)
+        # Action Panel - CRITICAL FIX: Use self.action_panel directly for the ActionPanel component
+        action_frame = ttk.Frame(main_frame, width=270)
         action_frame.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         action_frame.grid_propagate(False)  # Prevent resizing
 
+        # Create and pack the ActionPanel inside the frame - STORE THE REFERENCE CORRECTLY
         self.action_panel = ActionPanel(
             action_frame,
             on_mark_question=lambda: self._on_change_role(ParaRole.QUESTION),
@@ -142,12 +153,74 @@ class MainWindow(IMainWindowView, IParagraphListView):
         )
         self.action_panel.pack(fill=tk.BOTH, expand=True)
         
-        # Log Panel - reduced height
+        # Log Panel
         self.log_panel = LogPanel(self.root)
         self.log_panel.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 5))
 
         # Add window close protocol handler for graceful shutdown
         self.root.protocol("WM_DELETE_WINDOW", self._on_window_close)
+        
+        # Set up keyboard shortcuts
+        self._setup_keyboard_shortcuts()
+        
+        # Add window resize handler to ensure panel visibility
+        self.root.bind("<Configure>", self._on_window_resize)
+    
+    def _on_window_resize(self, event):
+        """Ensure proper layout when window is resized."""
+        # Only process if this is the root window being resized
+        if event.widget == self.root:
+            # Force the action panel to maintain its width
+            self.action_panel.configure(width=270)
+            # Update UI
+            self.root.update_idletasks()
+    
+    def _setup_keyboard_shortcuts(self):
+        """Set up keyboard shortcuts for common operations."""
+        # File operations
+        self.root.bind("<Control-o>", lambda e: self._on_load_click())
+        self.root.bind("<Control-s>", lambda e: self._on_save_click())
+        
+        # Editing operations
+        self.root.bind("<Control-q>", lambda e: self._on_change_role(ParaRole.QUESTION))
+        self.root.bind("<Control-a>", lambda e: self._on_change_role(ParaRole.ANSWER))
+        self.root.bind("<Control-i>", lambda e: self._on_change_role(ParaRole.IGNORE))
+        self.root.bind("<Control-m>", lambda e: self._on_merge_up())
+        
+        # Bind Undo/Redo - these may already exist but we'll ensure they're set up
+        self.root.bind("<Control-z>", lambda e: self._on_undo())
+        self.root.bind("<Control-y>", lambda e: self._on_redo())
+    
+    def _show_about(self):
+        """Show about dialog."""
+        messagebox.showinfo(
+            "About QA Verifier",
+            "QA Verifier Professional Edition\n\n"
+            "Version 1.0\n\n"
+            "A professional tool for verifying and processing Q&A documents, "
+            "designed to convert Word documents into CSV format for use in "
+            "various educational and testing applications."
+        )
+    
+    def _show_shortcuts(self):
+        """Show keyboard shortcuts dialog."""
+        shortcuts = (
+            "Keyboard Shortcuts\n\n"
+            "File Operations:\n"
+            "  Ctrl+O: Open DOCX file\n"
+            "  Ctrl+S: Save CSV file\n\n"
+            "Editing:\n"
+            "  Ctrl+Z: Undo\n"
+            "  Ctrl+Y: Redo\n"
+            "  Ctrl+Q: Mark as Question\n"
+            "  Ctrl+A: Mark as Answer\n"
+            "  Ctrl+I: Mark as Ignore\n"
+            "  Ctrl+M: Add to Previous Answer\n\n"
+            "Selection:\n"
+            "  Ctrl+Click: Select multiple items\n"
+            "  Shift+Click: Select range\n"
+        )
+        messagebox.showinfo("Keyboard Shortcuts", shortcuts)
     
     # IMainWindowView implementation
     def _toggle_manual_training_mode(self):
