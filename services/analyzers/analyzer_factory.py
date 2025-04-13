@@ -12,8 +12,8 @@ from services.analyzers.enhanced_rules_analyzer import EnhancedRuleAnalyzer
 
 # Try to import the AI analyzer, but gracefully handle if dependencies are missing
 try:
-    from services.analyzers.ai_analyzer import AIAnalyzer
-    AI_AVAILABLE = True
+    from services.analyzers.ai_analyzer import AIAnalyzer, TRANSFORMERS_AVAILABLE, ONNX_AVAILABLE
+    AI_AVAILABLE = TRANSFORMERS_AVAILABLE and ONNX_AVAILABLE
 except ImportError:
     AI_AVAILABLE = False
 
@@ -54,15 +54,15 @@ class AnalyzerFactory:
         
         elif analyzer_type == 'ai':
             if AI_AVAILABLE:
-                logger.info("Attempting to create AI analyzer")
+                logger.info("Attempting to create transformer-based AI analyzer")
                 ai_analyzer = AIAnalyzer()
                 
                 # Check if model is available
-                if ai_analyzer.model is not None:
-                    logger.info("AI model loaded successfully, using AI analyzer")
+                if ai_analyzer.onnx_session is not None:
+                    logger.info("Transformer model loaded successfully, using AI analyzer")
                     return ai_analyzer
                 else:
-                    logger.warning("AI model not loaded, falling back to enhanced rules")
+                    logger.warning("Transformer model not loaded, falling back to enhanced rules")
                     return EnhancedRuleAnalyzer()
             else:
                 logger.warning("AI analyzer requested but dependencies not available. Using enhanced rules instead.")
@@ -74,8 +74,8 @@ class AnalyzerFactory:
                 ai_analyzer = AIAnalyzer()
                 
                 # Check if model is available
-                if ai_analyzer.model is not None:
-                    logger.info("AI model loaded successfully, using AI analyzer")
+                if ai_analyzer.onnx_session is not None:
+                    logger.info("Transformer model loaded successfully, using AI analyzer")
                     return ai_analyzer
             
             logger.info("Auto mode: Using enhanced rule-based analyzer")

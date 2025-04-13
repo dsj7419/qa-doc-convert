@@ -19,6 +19,7 @@ pytest>=7.0.0           # Test runner
 transformers>=4.20.0    # Core library for models, tokenizers, pipelines
 datasets>=2.0.0         # Efficient data handling for training
 torch>=1.10.0           # Deep Learning Framework (PyTorch backend for transformers)
+accelerate>=0.26.0
 # Note: Alternatively, you could use tensorflow instead of torch if preferred
 
 # --- ONNX for Local Inference ---

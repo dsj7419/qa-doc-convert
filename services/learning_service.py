@@ -1,6 +1,7 @@
 """
 Learning service for managing AI model training and improvement.
 """
+import threading
 import logging
 import os
 import sys
@@ -17,18 +18,41 @@ from models.paragraph import Paragraph, ParaRole
 
 logger = logging.getLogger(__name__)
 
-# Try to import sklearn, but handle gracefully if not available
+# Try to import sklearn for LabelEncoder, still needed for label mapping
 try:
-    from sklearn.feature_extraction.text import CountVectorizer
-    from sklearn.linear_model import LogisticRegression
     from sklearn.preprocessing import LabelEncoder
     SKLEARN_AVAILABLE = True
 except ImportError:
-    logger.warning("scikit-learn not available. AI learning features will be disabled.")
+    logger.warning("scikit-learn not available. Some functions may be limited.")
     SKLEARN_AVAILABLE = False
+
+# Try to import transformer libraries, handling gracefully if not available
+try:
+    import torch
+    from transformers import AutoTokenizer, AutoModelForSequenceClassification
+    from transformers import TrainingArguments, Trainer
+    from transformers.onnx import export, FeaturesManager
+    import datasets
+    from pathlib import Path
+    TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    logger.warning("transformers or torch not available. AI learning features will be limited.")
+    TRANSFORMERS_AVAILABLE = False
+
+# Try to import ONNX, handling gracefully if not available
+try:
+    import onnx
+    import onnxruntime
+    ONNX_AVAILABLE = True
+except ImportError:
+    logger.warning("onnx or onnxruntime not available. ONNX export will be disabled.")
+    ONNX_AVAILABLE = False
 
 class LearningService:
     """Service for collecting training data and improving the AI model."""
+    
+    # Define the transformer model to use
+    MODEL_NAME = "distilbert-base-uncased"
     
     def __init__(self):
         """Initialize the learning service."""
@@ -63,12 +87,19 @@ class LearningService:
         
         # Define paths for user data
         self.training_data_path = os.path.join(self.user_data_dir, "training_data.json")
-        self.model_path = os.path.join(self.user_data_dir, "qa_classifier.pkl")
-        self.vocab_path = os.path.join(self.user_data_dir, "vocabulary.npy")
+        
+        # Define paths for transformer model
+        self.fine_tuned_model_dir = os.path.join(self.user_data_dir, "fine_tuned_model")
+        self.onnx_model_path = os.path.join(self.user_data_dir, "qa_classifier.onnx")
+        self.label_map_path = os.path.join(self.fine_tuned_model_dir, "label_map.json")
+        
+        # Paths for legacy model (for backwards compatibility)
+        self.legacy_model_path = os.path.join(self.user_data_dir, "qa_classifier.pkl")
+        self.legacy_vocab_path = os.path.join(self.user_data_dir, "vocabulary.npy")
         
         self._log_debug(f"Training data path: {self.training_data_path}")
-        self._log_debug(f"Model path: {self.model_path}")
-        self._log_debug(f"Vocabulary path: {self.vocab_path}")
+        self._log_debug(f"Fine-tuned model dir: {self.fine_tuned_model_dir}")
+        self._log_debug(f"ONNX model path: {self.onnx_model_path}")
         
         # Initialize or load training data
         self.training_data = self._load_training_data()
@@ -76,12 +107,18 @@ class LearningService:
         # Track whether the training data has changed
         self.data_changed = False
         
+        # Training thread and status tracking
+        self.training_thread = None
+        self.is_training = False
+        self.training_progress = {"status": "idle", "message": "No training in progress"}
+        self.training_callback = None
+        
         # Copy initial resources if needed
         self._init_resources()
         
         # Force training if we have data but no model
         total_examples = sum(len(examples) for role, examples in self.training_data.items())
-        if total_examples >= 10 and not os.path.exists(self.model_path) and SKLEARN_AVAILABLE:
+        if total_examples >= 10 and not os.path.exists(self.onnx_model_path) and TRANSFORMERS_AVAILABLE:
             self._log_debug(f"Found {total_examples} training examples but no model file. Forcing training on startup.")
             self.data_changed = True
             self.train_model(force=True)
@@ -117,39 +154,53 @@ class LearningService:
         """Initialize resources, copying bundled files if needed."""
         self._log_debug(f"Initializing resources at {datetime.now()}")
         
-        # Check if we need to copy initial model
-        if not os.path.exists(self.model_path):
-            self._log_debug(f"Model doesn't exist at {self.model_path}")
-            
-            initial_model_path = os.path.join(self.resources_dir, "qa_classifier.pkl")
-            self._log_debug(f"Checking for initial model at {initial_model_path}")
-            
-            if os.path.exists(initial_model_path):
-                self._log_debug(f"Initial model exists, copying...")
-                try:
-                    shutil.copy2(initial_model_path, self.model_path)
-                    self._log_debug(f"Copied initial model to {self.model_path}")
-                except Exception as e:
-                    self._log_debug(f"Error copying initial model: {e}")
-            else:
-                self._log_debug(f"Initial model not found")
+        # Create fine-tuned model directory if it doesn't exist
+        os.makedirs(self.fine_tuned_model_dir, exist_ok=True)
         
-        # Check if we need to copy initial vocabulary
-        if not os.path.exists(self.vocab_path):
-            self._log_debug(f"Vocabulary doesn't exist at {self.vocab_path}")
+        # Check if we need to copy initial model files
+        if not os.path.exists(self.onnx_model_path):
+            self._log_debug(f"ONNX model doesn't exist at {self.onnx_model_path}")
             
-            initial_vocab_path = os.path.join(self.resources_dir, "vocabulary.npy")
-            self._log_debug(f"Checking for initial vocabulary at {initial_vocab_path}")
-            
-            if os.path.exists(initial_vocab_path):
-                self._log_debug(f"Initial vocabulary exists, copying...")
+            # Check for bundled ONNX model
+            bundled_onnx_path = os.path.join(self.resources_dir, "qa_classifier.onnx")
+            if os.path.exists(bundled_onnx_path):
+                self._log_debug(f"Bundled ONNX model exists, copying...")
                 try:
-                    shutil.copy2(initial_vocab_path, self.vocab_path)
-                    self._log_debug(f"Copied initial vocabulary to {self.vocab_path}")
+                    shutil.copy2(bundled_onnx_path, self.onnx_model_path)
+                    self._log_debug(f"Copied bundled ONNX model to {self.onnx_model_path}")
                 except Exception as e:
-                    self._log_debug(f"Error copying initial vocabulary: {e}")
-            else:
-                self._log_debug(f"Initial vocabulary not found")
+                    self._log_debug(f"Error copying bundled ONNX model: {e}")
+        
+        # Check if we need to copy initial tokenizer and model files
+        if not os.path.exists(os.path.join(self.fine_tuned_model_dir, "config.json")):
+            self._log_debug(f"Transformer model files don't exist in {self.fine_tuned_model_dir}")
+            
+            # Check for bundled model directory
+            bundled_model_dir = os.path.join(self.resources_dir, "fine_tuned_model")
+            if os.path.exists(bundled_model_dir):
+                self._log_debug(f"Bundled transformer model exists, copying...")
+                try:
+                    # Copy all files from bundled model dir to user model dir
+                    for item in os.listdir(bundled_model_dir):
+                        src_path = os.path.join(bundled_model_dir, item)
+                        dst_path = os.path.join(self.fine_tuned_model_dir, item)
+                        if os.path.isdir(src_path):
+                            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(src_path, dst_path)
+                    self._log_debug(f"Copied bundled transformer model files to {self.fine_tuned_model_dir}")
+                except Exception as e:
+                    self._log_debug(f"Error copying bundled transformer model: {e}")
+        
+        # Also check for legacy model files (for backwards compatibility)
+        if not os.path.exists(self.legacy_model_path) and os.path.exists(self.onnx_model_path):
+            self._log_debug(f"Legacy model doesn't exist but ONNX does - creating placeholder")
+            try:
+                with open(self.legacy_model_path, 'wb') as f:
+                    pickle.dump("PLACEHOLDER - Using Transformer Model", f)
+                self._log_debug(f"Created placeholder legacy model file")
+            except Exception as e:
+                self._log_debug(f"Error creating placeholder legacy model: {e}")
     
     def _load_training_data(self) -> Dict[str, List[Dict[str, str]]]:
         """
@@ -311,11 +362,6 @@ class LearningService:
         Returns:
             bool: True if a new example was added, False otherwise
         """
-        # Skip if scikit-learn is not available
-        if not SKLEARN_AVAILABLE:
-            self._log_debug(f"Scikit-learn not available, skipping add_training_example")
-            return False
-        
         # Skip if the example is too short
         if len(text) < 10:
             self._log_debug(f"Example too short, skipping: {text[:20]}...")
@@ -381,7 +427,7 @@ class LearningService:
         self._log_debug(f"Total examples: {total_examples}")
         
         # Make sure we have at least some examples of each class
-        min_examples_per_class = 1  # Reduced from 5
+        min_examples_per_class = 1  # Reduced from 5, transformers can work with fewer examples
         has_all_classes = all(len(examples) >= min_examples_per_class for role, examples in self.training_data.items())
         
         # Make sure we have a reasonable total (at least 10 examples overall)
@@ -393,20 +439,22 @@ class LearningService:
         
         return result
     
-    def train_model(self, force: bool = False) -> bool:
+    def train_model(self, force: bool = False, background: bool = True, callback: Optional[Callable[[str, str], None]] = None) -> bool:
         """
         Train a new model if data has changed.
         
         Args:
             force: Force training even if data hasn't changed
+            background: Run training in a background thread
+            callback: Optional callback function for training status updates
             
         Returns:
-            bool: Success flag
+            bool: Success flag (or True if started in background)
         """
-        # Skip if scikit-learn is not available
-        if not SKLEARN_AVAILABLE:
-            self._log_debug(f"Scikit-learn not available. Cannot train model.")
-            logger.warning("scikit-learn not available. Cannot train model.")
+        # Skip if transformers is not available
+        if not TRANSFORMERS_AVAILABLE:
+            self._log_debug(f"Transformers not available. Cannot train model.")
+            logger.warning("transformers not available. Cannot train model.")
             return False
         
         self._log_debug(f"Train model called with force={force}, data_changed={self.data_changed}")
@@ -422,11 +470,87 @@ class LearningService:
             self._log_debug(f"Not enough training data to train a reliable model.")
             logger.info("Not enough training data to train a reliable model.")
             return False
+            
+        # Check if training is already in progress
+        if self.is_training:
+            self._log_debug(f"Training already in progress. Skipping new training request.")
+            logger.info("Training already in progress. Skipping new training request.")
+            if callback:
+                callback("Training already in progress", "INFO")
+            return False
+            
+        # Set callback if provided
+        self.training_callback = callback
         
-        self._log_debug(f"Training AI model from collected data at {datetime.now()}...")
-        logger.info("Training AI model from collected data...")
+        # If running in background
+        if background:
+            self._log_debug(f"Starting training in background thread")
+            # Mark as training
+            self.is_training = True
+            self.training_progress = {"status": "starting", "message": "Starting training process"}
+            
+            # Create and start training thread
+            self.training_thread = threading.Thread(
+                target=self._train_model_thread, 
+                args=(force,),
+                daemon=True
+            )
+            self.training_thread.start()
+            
+            if callback:
+                callback("Training started in background", "INFO")
+            return True
+        else:
+            # Run training synchronously
+            self._log_debug(f"Running training synchronously")
+            return self._train_model_internal(force)
+            
+    def _train_model_thread(self, force: bool) -> None:
+        """
+        Thread function for background training.
+        
+        Args:
+            force: Force training even if data hasn't changed
+        """
+        try:
+            success = self._train_model_internal(force)
+            if success:
+                self.training_progress = {"status": "completed", "message": "Training completed successfully"}
+                if self.training_callback:
+                    self.training_callback("Training completed successfully", "INFO")
+            else:
+                self.training_progress = {"status": "failed", "message": "Training failed"}
+                if self.training_callback:
+                    self.training_callback("Training failed", "ERROR")
+        except Exception as e:
+            self._log_debug(f"Error in training thread: {e}")
+            logger.error(f"Error in training thread: {e}", exc_info=True)
+            self.training_progress = {"status": "error", "message": f"Training error: {str(e)}"}
+            if self.training_callback:
+                self.training_callback(f"Training error: {str(e)}", "ERROR")
+        finally:
+            # Mark as no longer training
+            self.is_training = False
+            
+    def _train_model_internal(self, force: bool) -> bool:
+        """
+        Internal implementation of model training.
+        
+        Args:
+            force: Force training even if data hasn't changed
+            
+        Returns:
+            bool: Success flag
+        """
+        self._log_debug(f"Training transformer model from collected data at {datetime.now()}...")
+        logger.info("Training transformer model from collected data...")
         
         try:
+            # Update training progress
+            self.training_progress = {"status": "preparing", "message": "Preparing training data"}
+            if self.training_callback:
+                self.training_callback("Preparing training data", "INFO")
+                
             # Prepare training data
             texts = []
             labels = []
@@ -438,87 +562,180 @@ class LearningService:
             
             self._log_debug(f"Prepared {len(texts)} examples for training")
             
-            # Create vectorizer
-            vectorizer = CountVectorizer(
-                max_features=5000,
-                ngram_range=(1, 2),
-                stop_words='english'
+            # Update progress
+            self.training_progress = {"status": "tokenizing", "message": "Tokenizing data"}
+            if self.training_callback:
+                self.training_callback("Tokenizing training data", "INFO")
+            
+            # Create label encoder
+            if not SKLEARN_AVAILABLE:
+                self._log_debug("sklearn not available for LabelEncoder, using manual mapping")
+                # Manual implementation of label encoding
+                unique_labels = list(set(labels))
+                label_map = {label: i for i, label in enumerate(unique_labels)}
+                int_labels = [label_map[label] for label in labels]
+                inverse_label_map = {i: label for label, i in label_map.items()}
+            else:
+                # Use sklearn's LabelEncoder
+                le = LabelEncoder()
+                int_labels = le.fit_transform(labels)
+                inverse_label_map = {i: label for i, label in enumerate(le.classes_)}
+            
+            self._log_debug(f"Label mapping: {inverse_label_map}")
+            num_labels = len(inverse_label_map)
+            
+            # Create Dataset object
+            data_dict = {'text': texts, 'label': int_labels}
+            hf_dataset = datasets.Dataset.from_dict(data_dict)
+            
+            # Load pre-trained tokenizer
+            tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+            
+            # Tokenize dataset
+            def tokenize_function(examples):
+                return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=128)
+                
+            tokenized_dataset = hf_dataset.map(tokenize_function, batched=True)
+            self._log_debug(f"Tokenized dataset successfully")
+            
+            # Update progress
+            self.training_progress = {"status": "training", "message": "Training model"}
+            if self.training_callback:
+                self.training_callback("Training model", "INFO")
+            
+            # Load pre-trained model
+            model = AutoModelForSequenceClassification.from_pretrained(
+                self.MODEL_NAME, 
+                num_labels=num_labels
             )
             
-            # Fit vectorizer and transform texts
-            X = vectorizer.fit_transform(texts).toarray()
-            self._log_debug(f"Created feature matrix with shape {X.shape}")
+            # Define training arguments
+            training_args = TrainingArguments(
+                output_dir=os.path.join(self.user_data_dir, "training_checkpoints"),
+                num_train_epochs=3,  # Adjust based on dataset size
+                per_device_train_batch_size=8,  # Adjust based on available memory
+                learning_rate=5e-5,
+                logging_dir=os.path.join(self.user_data_dir, "training_logs"),
+                logging_steps=10,
+                save_strategy="epoch",
+                load_best_model_at_end=False,  # Simplify for now
+                report_to="none",  # Disable reporting to avoid cloud services
+            )
             
-            # Save vocabulary with improved error checking
-            vocab_tmp = f"{self.vocab_path}.tmp"
-            np.save(vocab_tmp, vectorizer.vocabulary_)
-            if os.path.exists(vocab_tmp) and os.path.getsize(vocab_tmp) > 0:
-                self._log_debug(f"Vocabulary file created successfully: {os.path.getsize(vocab_tmp)} bytes")
-                if os.path.exists(self.vocab_path):
-                    os.remove(self.vocab_path)
-                    self._log_debug(f"Removed existing vocabulary file")
-                os.rename(vocab_tmp, self.vocab_path)
-                self._log_debug(f"Renamed vocabulary file to final path")
+            # Create Trainer
+            trainer = Trainer(
+                model=model,
+                args=training_args,
+                train_dataset=tokenized_dataset,
+            )
+            
+            # Train the model
+            self._log_debug("Starting trainer.train()")
+            trainer.train()
+            self._log_debug("Completed trainer.train()")
+            
+            # Update progress
+            self.training_progress = {"status": "saving", "message": "Saving trained model"}
+            if self.training_callback:
+                self.training_callback("Saving trained model", "INFO")
+            
+            # Create fine-tuned model directory if it doesn't exist
+            os.makedirs(self.fine_tuned_model_dir, exist_ok=True)
+            
+            # Save the fine-tuned model and tokenizer
+            self._log_debug(f"Saving fine-tuned model to {self.fine_tuned_model_dir}")
+            trainer.save_model(self.fine_tuned_model_dir)
+            tokenizer.save_pretrained(self.fine_tuned_model_dir)
+            
+            # Save the label map
+            with open(self.label_map_path, 'w') as f:
+                json.dump(inverse_label_map, f)
+            
+            self._log_debug(f"Saved label map to {self.label_map_path}")
+            
+            # Export to ONNX if available
+            if ONNX_AVAILABLE:
+                self._log_debug("ONNX is available, starting export")
+                self.training_progress = {"status": "exporting", "message": "Exporting to ONNX format"}
+                if self.training_callback:
+                    self.training_callback("Exporting to ONNX format", "INFO")
+                
+                success = self._export_to_onnx(model, tokenizer)
+                if not success:
+                    self._log_debug("ONNX export failed but model training succeeded")
+                    # Continue anyway, inference can still use PyTorch model
             else:
-                self._log_debug(f"Error: Vocabulary file creation failed or is empty!")
-                
-            self._log_debug(f"Saved vocabulary with {len(vectorizer.vocabulary_)} features")
+                self._log_debug("ONNX is not available, skipping export")
             
-            # Encode labels
-            le = LabelEncoder()
-            y = le.fit_transform(labels)
-            self._log_debug(f"Encoded labels: {list(le.classes_)}")
-            
-            # Train model
-            model = LogisticRegression(max_iter=1000)
-            model.fit(X, y)
-            self._log_debug(f"Trained LogisticRegression model")
-            
-            # Save model with robust error handling
-            model_tmp = f"{self.model_path}.tmp"
-            try:
-                with open(model_tmp, "wb") as f:
-                    pickle.dump(model, f)
-                self._log_debug(f"Wrote model to temporary file: {model_tmp}")
-                
-                # Verify the file was created and has content
-                if os.path.exists(model_tmp) and os.path.getsize(model_tmp) > 0:
-                    self._log_debug(f"Model file created successfully: {os.path.getsize(model_tmp)} bytes")
-                    
-                    if os.path.exists(self.model_path):
-                        try:
-                            os.remove(self.model_path)
-                            self._log_debug(f"Removed existing model file")
-                        except Exception as e:
-                            self._log_debug(f"Warning: Error removing existing model file: {e}")
-                    
-                    try:
-                        os.rename(model_tmp, self.model_path)
-                        self._log_debug(f"Renamed model file to final path: {self.model_path}")
-                        
-                        if not os.path.exists(self.model_path):
-                            self._log_debug(f"ERROR: Final model file doesn't exist after renaming!")
-                            return False
-                    except Exception as e:
-                        self._log_debug(f"ERROR: Failed to rename model file: {e}")
-                        return False
-                else:
-                    self._log_debug(f"ERROR: Model file was not created or is empty!")
-                    return False
-            except Exception as e:
-                self._log_debug(f"ERROR: Failed to save model: {e}")
-                return False
-            
-            # Reset change flag
+            # If we made it here, training was successful
             self.data_changed = False
             
-            self._log_debug(f"Successfully trained and saved model with {len(texts)} examples")
-            logger.info(f"Successfully trained and saved model with {len(texts)} examples")
+            # Clean up legacy files if they exist
+            if os.path.exists(self.legacy_model_path):
+                # Just create a placeholder instead of deleting to avoid errors
+                try:
+                    with open(self.legacy_model_path, 'wb') as f:
+                        pickle.dump("PLACEHOLDER - Using Transformer Model", f)
+                    self._log_debug(f"Replaced legacy model with placeholder")
+                except Exception as e:
+                    self._log_debug(f"Error replacing legacy model: {e}")
+            
+            if os.path.exists(self.legacy_vocab_path):
+                try:
+                    os.remove(self.legacy_vocab_path)
+                    self._log_debug(f"Removed legacy vocabulary file")
+                except Exception as e:
+                    self._log_debug(f"Error removing legacy vocabulary file: {e}")
+            
+            self._log_debug(f"Successfully trained and saved transformer model with {len(texts)} examples")
+            logger.info(f"Successfully trained and saved transformer model with {len(texts)} examples")
             return True
             
         except Exception as e:
-            self._log_debug(f"Error training model: {e}")
-            logger.error(f"Error training model: {e}", exc_info=True)
+            self._log_debug(f"Error training transformer model: {e}")
+            logger.error(f"Error training transformer model: {e}", exc_info=True)
+            return False
+    
+    def _export_to_onnx(self, model, tokenizer) -> bool:
+        """
+        Export model to ONNX format for efficient inference.
+        
+        Args:
+            model: The PyTorch model to export
+            tokenizer: The tokenizer to use with the model
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            self._log_debug(f"Exporting model to ONNX format at {self.onnx_model_path}")
+            
+            # Create parent directory if needed
+            os.makedirs(os.path.dirname(self.onnx_model_path), exist_ok=True)
+            
+            # Define paths
+            onnx_path = Path(self.onnx_model_path)
+            
+            # Use transformers ONNX export utility
+            model_kind, model_onnx_config = FeaturesManager.check_supported_model_or_raise(model)
+            onnx_config = model_onnx_config(model.config)
+            
+            # Export the model
+            export(
+                preprocessor=tokenizer,
+                model=model,
+                config=onnx_config,
+                # Force opset 14 for scaled_dot_product_attention operator
+                opset=14,
+                output=onnx_path
+            )
+            
+            self._log_debug(f"Successfully exported model to ONNX format at {self.onnx_model_path}")
+            return True
+            
+        except Exception as e:
+            self._log_debug(f"Error exporting to ONNX: {e}")
+            logger.error(f"Error exporting to ONNX: {e}", exc_info=True)
             return False
     
     def collect_training_data_from_document(self, paragraphs: List[Paragraph]) -> None:
@@ -528,11 +745,6 @@ class LearningService:
         Args:
             paragraphs: List of paragraphs with assigned roles
         """
-        # Skip if scikit-learn is not available
-        if not SKLEARN_AVAILABLE:
-            self._log_debug(f"Scikit-learn not available, skipping collect_training_data_from_document")
-            return
-        
         self._log_debug(f"Collecting training data from document with {len(paragraphs)} paragraphs")
         
         # Track if we've added any new examples
@@ -584,12 +796,6 @@ class LearningService:
         Returns:
             bool: Success flag
         """
-        # Skip if scikit-learn is not available
-        if not SKLEARN_AVAILABLE:
-            self._log_debug(f"Scikit-learn not available, skipping collection")
-            log_callback("scikit-learn not available, skipping collection", "WARNING")
-            return False
-        
         self._log_debug(f"Collecting training data from {len(paragraphs)} paragraphs with feedback")
         log_callback(f"Collecting training data from {len(paragraphs)} paragraphs...", "INFO")
         
@@ -664,6 +870,20 @@ class LearningService:
         
         return True
     
+    def get_training_status(self) -> Dict[str, Any]:
+        """
+        Get the current training status.
+        
+        Returns:
+            Dict with training status information
+        """
+        status = {
+            "is_training": self.is_training,
+            "progress": self.training_progress,
+            "thread_alive": self.training_thread.is_alive() if self.training_thread else False
+        }
+        return status
+        
     def get_training_stats(self) -> Dict[str, Any]:
         """
         Get statistics about the current training data.
@@ -674,11 +894,15 @@ class LearningService:
         stats = {
             'total_examples': sum(len(examples) for examples in self.training_data.values()),
             'by_class': {role: len(examples) for role, examples in self.training_data.items()},
-            'has_model': os.path.exists(self.model_path),
-            'model_path': self.model_path,
-            'ai_available': SKLEARN_AVAILABLE,
+            'has_model': (os.path.exists(self.onnx_model_path) or 
+                          os.path.exists(os.path.join(self.fine_tuned_model_dir, "pytorch_model.bin"))),
+            'model_path': self.fine_tuned_model_dir,
+            'onnx_path': self.onnx_model_path,
+            'transformers_available': TRANSFORMERS_AVAILABLE,
+            'onnx_available': ONNX_AVAILABLE,
             'user_data_dir': self.user_data_dir,
-            'data_changed': self.data_changed
+            'data_changed': self.data_changed,
+            'is_training': self.is_training
         }
         self._log_debug(f"Generated training stats: {stats}")
         return stats
@@ -702,15 +926,28 @@ class LearningService:
             # Save empty training data
             self._save_training_data()
             
-            # Remove model file if it exists
-            if os.path.exists(self.model_path):
-                os.remove(self.model_path)
-                self._log_debug(f"Removed model file: {self.model_path}")
+            # Remove model files
+            if os.path.exists(self.onnx_model_path):
+                os.remove(self.onnx_model_path)
+                self._log_debug(f"Removed ONNX model file: {self.onnx_model_path}")
+            
+            if os.path.exists(self.fine_tuned_model_dir):
+                try:
+                    shutil.rmtree(self.fine_tuned_model_dir)
+                    self._log_debug(f"Removed fine-tuned model directory: {self.fine_tuned_model_dir}")
+                    # Recreate an empty directory
+                    os.makedirs(self.fine_tuned_model_dir, exist_ok=True)
+                except Exception as e:
+                    self._log_debug(f"Error removing fine-tuned model directory: {e}")
+            
+            # Remove legacy files
+            if os.path.exists(self.legacy_model_path):
+                os.remove(self.legacy_model_path)
+                self._log_debug(f"Removed legacy model file: {self.legacy_model_path}")
                 
-            # Remove vocabulary file if it exists
-            if os.path.exists(self.vocab_path):
-                os.remove(self.vocab_path)
-                self._log_debug(f"Removed vocabulary file: {self.vocab_path}")
+            if os.path.exists(self.legacy_vocab_path):
+                os.remove(self.legacy_vocab_path)
+                self._log_debug(f"Removed legacy vocabulary file: {self.legacy_vocab_path}")
                 
             return True
         except Exception as e:

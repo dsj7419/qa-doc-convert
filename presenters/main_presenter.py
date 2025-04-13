@@ -150,19 +150,26 @@ class MainPresenter:
             train_attempt = False
             if self.learning_service.has_enough_data_to_train():
                 self.view.log_message("Training AI model with collected examples...", level="INFO")
-                success = self.learning_service.train_model(force=True)  # Force training even if no new data
+                
+                # Train in background with a callback for logging
+                success = self.learning_service.train_model(
+                    force=True,  # Force training even if no new data
+                    background=True,  # Train in background
+                    callback=self.view.log_message  # Pass the log_message function as callback
+                )
+                
                 train_attempt = True
                 if success:
-                    self.view.log_message("AI model successfully trained", level="INFO")
+                    self.view.log_message("AI model training started in background", level="INFO")
                 else:
-                    self.view.log_message("Failed to train AI model - check logs for details", level="WARNING")
+                    self.view.log_message("Failed to start AI model training - check logs for details", level="WARNING")
             elif examples_added > 0:
                 self.view.log_message("Added examples to training data, but not enough to train model yet", level="INFO")
             
             # Show success message with training info
             success_message = f"Verified Q&A data saved to:\n{save_path}"
             if examples_added > 0 and train_attempt:
-                success_message += f"\n\nAdded {examples_added} training examples and updated the AI model."
+                success_message += f"\n\nAdded {examples_added} training examples and started AI model training in the background."
             elif examples_added > 0:
                 success_message += f"\n\nAdded {examples_added} training examples."
             self.view.show_info("Save Successful", success_message)
@@ -405,7 +412,8 @@ class MainPresenter:
         """Verify file permissions for training data."""
         directory = self.learning_service.user_data_dir
         training_file = self.learning_service.training_data_path
-        model_file = self.learning_service.model_path
+        model_dir = self.learning_service.fine_tuned_model_dir
+        onnx_file = self.learning_service.onnx_model_path
         
         # Check directory
         dir_exists = os.path.exists(directory)
@@ -417,11 +425,15 @@ class MainPresenter:
         training_writable = os.access(training_file, os.W_OK) if training_exists else False
         training_size = os.path.getsize(training_file) if training_exists else 0
         
-        # Check model file
-        model_exists = os.path.exists(model_file)
-        model_readable = os.access(model_file, os.R_OK) if model_exists else False
-        model_writable = os.access(model_file, os.W_OK) if model_exists else False
-        model_size = os.path.getsize(model_file) if model_exists else 0
+        # Check model directory
+        model_exists = os.path.exists(model_dir)
+        model_readable = os.access(model_dir, os.R_OK) if model_exists else False
+        model_writable = os.access(model_dir, os.W_OK) if model_exists else False
+        
+        # Check ONNX file
+        onnx_exists = os.path.exists(onnx_file)
+        onnx_readable = os.access(onnx_file, os.R_OK) if onnx_exists else False
+        onnx_size = os.path.getsize(onnx_file) if onnx_exists else 0
         
         # Format message
         message = (
@@ -433,11 +445,14 @@ class MainPresenter:
             f"  Readable: {training_readable}\n"
             f"  Writable: {training_writable}\n"
             f"  Size: {training_size} bytes\n\n"
-            f"Model File: {model_file}\n"
+            f"Model Directory: {model_dir}\n"
             f"  Exists: {model_exists}\n"
             f"  Readable: {model_readable}\n"
-            f"  Writable: {model_writable}\n"
-            f"  Size: {model_size} bytes\n"
+            f"  Writable: {model_writable}\n\n"
+            f"ONNX Model File: {onnx_file}\n"
+            f"  Exists: {onnx_exists}\n"
+            f"  Readable: {onnx_readable}\n"
+            f"  Size: {onnx_size} bytes\n"
         )
         
         # Try to create test files
