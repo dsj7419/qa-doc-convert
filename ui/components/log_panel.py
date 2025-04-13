@@ -1,5 +1,5 @@
 """
-Log panel component with fixed button text color.
+Log panel component.
 """
 import logging
 import tkinter as tk
@@ -25,35 +25,32 @@ class LogPanel(ttk.Frame):
     
     def _init_ui(self):
         """Initialize UI elements."""
-        # Log header with better contrast
+        # Log header
         header_container = ttk.Frame(self, style='TFrame')
         header_container.pack(fill=tk.X, padx=5, pady=(0, 5))
         
-        # Make the container visually distinct - use tk.Frame for direct color control
-        header_bg = tk.Frame(
-            header_container,
-            bg=AppTheme.COLORS['action_button_bg'],
-            padx=5,
-            pady=3
-        )
+        # Header with background
+        header_bg = ttk.Frame(header_container, style='Header.TFrame')
         header_bg.pack(fill=tk.X, expand=True)
         
-        # Log icon
-        log_icon = tk.Label(
-            header_bg,
-            text="📋",  # Clipboard emoji
-            font=("Segoe UI", 12),
-            fg="#ffffff",  # White for contrast
-            bg=AppTheme.COLORS['action_button_bg']
+        # Create header content with icon and text
+        header_content = ttk.Frame(header_bg, style='Header.TFrame')
+        header_content.pack(fill=tk.X, padx=5, pady=3)
+        
+        # Log icon (clipboard emoji)
+        log_icon = ttk.Label(
+            header_content,
+            text="📋",
+            style='Header.TLabel',
+            font=("Segoe UI", 12)
         )
         log_icon.pack(side=tk.LEFT, padx=(0, 8))
         
-        header_label = tk.Label(
-            header_bg,
+        header_label = ttk.Label(
+            header_content,
             text="Log:",
-            font=AppTheme.FONTS['bold'],
-            fg="#ffffff",  # White for contrast
-            bg=AppTheme.COLORS['action_button_bg']
+            style='Header.TLabel',
+            font=AppTheme.FONTS['bold']
         )
         header_label.pack(side=tk.LEFT)
         
@@ -64,7 +61,7 @@ class LogPanel(ttk.Frame):
         # Log text widget - reduced height
         self.log_text = scrolledtext.ScrolledText(
             log_container,
-            height=4,  # Reduced from 6
+            height=4,
             font=AppTheme.FONTS['log'],
             bg="white",
             relief=tk.SUNKEN,
@@ -83,20 +80,13 @@ class LogPanel(ttk.Frame):
         button_container = ttk.Frame(self, style='TFrame')
         button_container.pack(fill=tk.X, padx=5, pady=(5, 0))
         
-        # DIRECT APPROACH: Use plain tk.Button
-        clear_btn = tk.Button(
+        # Clear button
+        clear_btn = ttk.Button(
             button_container,
             text="Clear Log",
             command=self._clear_log,
-            bg=AppTheme.COLORS['action_button_bg'],
-            fg="#ffffff",  # FORCE WHITE TEXT
-            activebackground=AppTheme.COLORS['action_button_hover'],
-            activeforeground="#ffffff",  # WHITE TEXT ON HOVER
-            font=AppTheme.FONTS['normal'],
-            relief="raised",
-            borderwidth=1,
-            width=10,
-            cursor="hand2"
+            style='Action.TButton',
+            width=10
         )
         clear_btn.pack(side=tk.RIGHT, pady=(5, 0))
     

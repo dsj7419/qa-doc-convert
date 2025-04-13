@@ -2,7 +2,7 @@
 Tests for the analyzers.
 """
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from services.analyzers.heuristic_analyzer import HeuristicAnalyzer
 from services.analyzers.enhanced_rules_analyzer import EnhancedRuleAnalyzer
@@ -56,11 +56,13 @@ class TestAnalyzerFactory:
     
     def test_create_analyzer_default(self):
         """Test factory with default config."""
-        analyzer = AnalyzerFactory.create_analyzer()
-        
-        # By default, should return either HeuristicAnalyzer or EnhancedRuleAnalyzer
-        # Since the model file doesn't exist in tests
-        assert isinstance(analyzer, (HeuristicAnalyzer, EnhancedRuleAnalyzer))
+        # Mock AI_AVAILABLE to return False for testing
+        with patch('services.analyzers.analyzer_factory.AI_AVAILABLE', False):
+            analyzer = AnalyzerFactory.create_analyzer()
+            
+            # By default, should return either HeuristicAnalyzer or EnhancedRuleAnalyzer
+            # when AI is not available
+            assert isinstance(analyzer, (HeuristicAnalyzer, EnhancedRuleAnalyzer))
     
     def test_create_analyzer_heuristic(self):
         """Test factory with heuristic config."""

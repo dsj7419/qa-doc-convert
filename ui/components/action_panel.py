@@ -1,17 +1,17 @@
 """
-Action panel component with direct button fixes.
+Action panel component.
 """
 import tkinter as tk
 from tkinter import ttk
 
-from utils.theme import AppTheme, TkButton
+from utils.theme import AppTheme
 
 class ActionPanel(ttk.Frame):
     """Panel containing action buttons and controls."""
     
     def __init__(self, parent, on_mark_question=None, on_mark_answer=None, 
                  on_mark_ignore=None, on_merge_up=None, on_set_expected_count=None,
-                 on_exit=None):
+                 on_exit=None, on_undo=None, on_redo=None):
         """
         Initialize the action panel.
         
@@ -23,6 +23,8 @@ class ActionPanel(ttk.Frame):
             on_merge_up: Callback for merging into previous answer
             on_set_expected_count: Callback for setting expected count
             on_exit: Callback for exit button
+            on_undo: Callback for undo button
+            on_redo: Callback for redo button
         """
         super().__init__(parent, style='TFrame')
         
@@ -32,113 +34,110 @@ class ActionPanel(ttk.Frame):
         self.on_merge_up = on_merge_up
         self.on_set_expected_count = on_set_expected_count
         self.on_exit = on_exit
+        self.on_undo = on_undo
+        self.on_redo = on_redo
         
         self._init_ui()
     
     def _init_ui(self):
         """Initialize UI elements."""
-        # Create title background - use tk.Frame for direct color control
-        title_bg = tk.Frame(self, bg=AppTheme.COLORS['action_button_bg'], padx=5, pady=5)
-        title_bg.pack(fill=tk.X, padx=5, pady=(0, 10))
+        # Create title frame
+        title_frame = ttk.Frame(self, style='TFrame')
+        title_frame.pack(fill=tk.X, padx=5, pady=(0, 10))
         
-        # Main title with white text for better contrast
-        title_label = tk.Label(
+        # Title label with background
+        title_bg = ttk.Frame(title_frame, style='Header.TFrame')
+        title_bg.pack(fill=tk.X)
+        
+        title_label = ttk.Label(
             title_bg,
             text="Actions for Selected:",
-            font=AppTheme.FONTS['bold'],
-            fg="#ffffff",  # White text
-            bg=AppTheme.COLORS['action_button_bg']  # Match the button background
+            style='Header.TLabel',
+            font=AppTheme.FONTS['bold']
         )
-        title_label.pack(anchor="w", fill=tk.X)
+        title_label.pack(anchor="w", fill=tk.X, padx=5, pady=5)
         
-        # Create container for action buttons with reduced padding
+        # Create container for action buttons
         actions_container = ttk.Frame(self, style='TFrame', padding=(3, 5, 3, 5))
         actions_container.pack(fill=tk.X, padx=3, pady=2)
         
-        # DIRECT APPROACH: Use plain tk.Button for the 4 main action buttons
-        # Button 1: Mark as QUESTION - pure Tkinter button with explicit white text
-        self.btn_question = tk.Button(
+        # Action buttons
+        self.btn_question = ttk.Button(
             actions_container,
             text="Mark as QUESTION",
             command=self._on_mark_question,
-            bg=AppTheme.COLORS['action_button_bg'],
-            fg="#ffffff",  # DIRECT WHITE TEXT 
-            activebackground=AppTheme.COLORS['action_button_hover'],
-            activeforeground="#ffffff",
-            font=AppTheme.FONTS['normal'],
-            relief="raised",
-            borderwidth=1,
-            width=20,
-            height=1
+            style='Action.TButton',
+            width=20
         )
         self.btn_question.pack(pady=2, fill=tk.X)
         
-        # Button 2: Mark as ANSWER - pure Tkinter button with explicit white text
-        self.btn_answer = tk.Button(
+        self.btn_answer = ttk.Button(
             actions_container,
             text="Mark as ANSWER",
             command=self._on_mark_answer,
-            bg=AppTheme.COLORS['action_button_bg'],
-            fg="#ffffff",  # DIRECT WHITE TEXT
-            activebackground=AppTheme.COLORS['action_button_hover'],
-            activeforeground="#ffffff",
-            font=AppTheme.FONTS['normal'],
-            relief="raised",
-            borderwidth=1,
-            width=20,
-            height=1
+            style='Action.TButton',
+            width=20
         )
         self.btn_answer.pack(pady=2, fill=tk.X)
         
-        # Button 3: Mark as IGNORE - pure Tkinter button with explicit white text
-        self.btn_ignore = tk.Button(
+        self.btn_ignore = ttk.Button(
             actions_container,
             text="Mark as IGNORE",
             command=self._on_mark_ignore,
-            bg=AppTheme.COLORS['action_button_bg'],
-            fg="#ffffff",  # DIRECT WHITE TEXT
-            activebackground=AppTheme.COLORS['action_button_hover'],
-            activeforeground="#ffffff",
-            font=AppTheme.FONTS['normal'],
-            relief="raised",
-            borderwidth=1,
-            width=20,
-            height=1
+            style='Action.TButton',
+            width=20
         )
         self.btn_ignore.pack(pady=2, fill=tk.X)
         
         ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
         
-        # Create a separate container for merge action - more compact
+        # Create a separate container for merge action
         merge_container = ttk.Frame(self, style='TFrame', padding=(3, 2, 3, 2))
         merge_container.pack(fill=tk.X, padx=3, pady=2)
         
-        # Button 4: Add to Previous Answer - pure Tkinter button with explicit white text
-        self.btn_merge_up = tk.Button(
+        # Merge button
+        self.btn_merge_up = ttk.Button(
             merge_container,
             text="Add to Previous Answer",
             command=self._on_merge_up,
-            bg=AppTheme.COLORS['action_button_bg'],
-            fg="#ffffff",  # DIRECT WHITE TEXT
-            activebackground=AppTheme.COLORS['action_button_hover'],
-            activeforeground="#ffffff",
-            font=AppTheme.FONTS['normal'],
-            relief="raised",
-            borderwidth=1,
-            width=20,
-            height=1
+            style='Action.TButton',
+            width=20
         )
         self.btn_merge_up.pack(pady=2, fill=tk.X)
         
         # Add a small tooltip label to explain the functionality
-        merge_tooltip = tk.Label(
+        merge_tooltip = ttk.Label(
             merge_container,
             text="(For multi-paragraph answers)",
-            font=(AppTheme.FONTS['normal'][0], 7),
-            fg="#555555",
-            bg=AppTheme.COLORS['bg']
+            font=("Segoe UI" if AppTheme.FONTS['normal'] is None else AppTheme.FONTS['normal'][0], 7)
         )
         merge_tooltip.pack(pady=(0, 2), fill=tk.X)
+        
+        # Add undo/redo container
+        undo_container = ttk.Frame(self, style='TFrame', padding=(3, 2, 3, 2))
+        undo_container.pack(fill=tk.X, padx=3, pady=2)
+        
+        # Undo/Redo buttons (side by side)
+        buttons_frame = ttk.Frame(undo_container)
+        buttons_frame.pack(fill=tk.X)
+        buttons_frame.columnconfigure(0, weight=1)
+        buttons_frame.columnconfigure(1, weight=1)
+        
+        self.btn_undo = ttk.Button(
+            buttons_frame,
+            text="↩ Undo",
+            command=self._on_undo,
+            style='Action.TButton'
+        )
+        self.btn_undo.grid(row=0, column=0, sticky="ew", padx=(0, 2))
+        
+        self.btn_redo = ttk.Button(
+            buttons_frame,
+            text="Redo ↪",
+            command=self._on_redo,
+            style='Action.TButton'
+        )
+        self.btn_redo.grid(row=0, column=1, sticky="ew", padx=(2, 0))
         
         ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=5)
         
@@ -146,20 +145,19 @@ class ActionPanel(ttk.Frame):
         stats_container = ttk.Frame(self, style='TFrame', padding=(10, 10, 10, 10))
         stats_container.pack(fill=tk.X, padx=5, pady=5)
         
-        # Expected Question Count Frame with better visual design
+        # Expected Question Count Frame
         count_frame = ttk.Frame(stats_container, style='TFrame')
         count_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Expected Questions label with better contrast - use tk.Frame for direct color control
-        count_label_container = tk.Frame(count_frame, bg=AppTheme.COLORS['action_button_bg'])
-        count_label_container.pack(side=tk.LEFT)
+        # Expected Questions label with background
+        count_bg = ttk.Frame(count_frame, style='Header.TFrame')
+        count_bg.pack(side=tk.LEFT)
         
-        count_label = tk.Label(
-            count_label_container,
+        count_label = ttk.Label(
+            count_bg,
             text="Expected # of Questions:",
-            font=AppTheme.FONTS['bold'],
-            fg="#ffffff",  # White text
-            bg=AppTheme.COLORS['action_button_bg']
+            style='Header.TLabel',
+            font=AppTheme.FONTS['bold']
         )
         count_label.pack(side=tk.LEFT, padx=5, pady=3)
         
@@ -168,38 +166,29 @@ class ActionPanel(ttk.Frame):
             count_frame,
             textvariable=self.question_count_var,
             width=5,
-            justify=tk.CENTER,
-            style='TEntry'
+            justify=tk.CENTER
         )
         self.count_entry.pack(side=tk.LEFT, padx=5)
         
-        # Replace ttk.Button with a standard tk.Button for consistent styling
-        set_count_btn = tk.Button(
+        set_count_btn = ttk.Button(
             count_frame,
             text="Set",
             command=self._on_set_expected_count,
-            bg=AppTheme.COLORS['action_button_bg'],
-            fg="#ffffff",  # DIRECT WHITE TEXT
-            activebackground=AppTheme.COLORS['action_button_hover'],
-            activeforeground="#ffffff",
-            font=AppTheme.FONTS['normal'],
-            relief="raised",
-            borderwidth=1,
+            style='Small.Action.TButton',
             width=5
         )
         set_count_btn.pack(side=tk.LEFT)
         
-        # Stats title with styling - use tk.Frame for direct color control
-        stats_title_bg = tk.Frame(stats_container, bg=AppTheme.COLORS['action_button_bg'])
-        stats_title_bg.pack(fill=tk.X, pady=(0, 10))
+        # Stats title background
+        stats_bg = ttk.Frame(stats_container, style='Header.TFrame')
+        stats_bg.pack(fill=tk.X, pady=(0, 10))
         
-        # Info/Stats Area with enhanced styling
-        stats_label = tk.Label(
-            stats_title_bg,
+        # Info/Stats Area
+        stats_label = ttk.Label(
+            stats_bg,
             text="Current Stats:",
-            font=AppTheme.FONTS['bold'],
-            fg="#ffffff",  # White text
-            bg=AppTheme.COLORS['action_button_bg']
+            style='Header.TLabel',
+            font=AppTheme.FONTS['bold']
         )
         stats_label.pack(anchor="w", fill=tk.X, padx=5, pady=5)
         
@@ -210,39 +199,54 @@ class ActionPanel(ttk.Frame):
         )
         self.stats_label.pack(anchor="w", pady=(0, 5))
         
-        # Progress bar with better styling
+        # Progress bar
         self.progress_var = tk.DoubleVar(value=0)
         self.progress_bar = ttk.Progressbar(
             stats_container,
             orient=tk.HORIZONTAL,
             length=200,
             mode='determinate',
-            variable=self.progress_var,
-            style='TProgressbar'
+            variable=self.progress_var
         )
         self.progress_bar.pack(anchor="w", pady=5, fill=tk.X)
+        
+        # Training status label (for background training feedback)
+        self.training_frame = ttk.Frame(stats_container)
+        self.training_frame.pack(fill=tk.X, pady=5)
+        
+        self.training_status_var = tk.StringVar(value="")
+        self.training_status = ttk.Label(
+            self.training_frame,
+            textvariable=self.training_status_var,
+            font=AppTheme.FONTS['normal'],
+            foreground=AppTheme.COLORS['accent']
+        )
+        self.training_status.pack(anchor="w", fill=tk.X)
+        
+        # Initially hide training status
+        self.training_frame.pack_forget()
         
         # Exit button at bottom
         ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
         
-        # Create a button container for the exit button - more compact
+        # Create a button container for the exit button
         exit_container = ttk.Frame(self, style='TFrame', padding=(3, 2, 3, 2))
         exit_container.pack(fill=tk.X, padx=3, pady=2, side=tk.BOTTOM)
         
-        exit_btn = TkButton(
+        exit_btn = ttk.Button(
             exit_container,
             text="Exit Application",
             command=self._on_exit,
-            style='danger',
-            width=15,  # Reduced width
-            height=1,  # Reduced height
-            padx=3,    # Reduced padding
-            pady=1     # Reduced padding
+            style='Danger.TButton',
+            width=15
         )
         exit_btn.pack(pady=0, side=tk.RIGHT)
         
         # Initially disable action buttons
         self._update_button_states(False)
+        
+        # Initially disable undo/redo buttons
+        self.update_undo_redo_state(False, False)
     
     def _update_button_states(self, enabled):
         """
@@ -251,7 +255,7 @@ class ActionPanel(ttk.Frame):
         Args:
             enabled: Whether buttons should be enabled
         """
-        state = tk.NORMAL if enabled else tk.DISABLED
+        state = "normal" if enabled else "disabled"
         
         self.btn_question.config(state=state)
         self.btn_answer.config(state=state)
@@ -266,6 +270,17 @@ class ActionPanel(ttk.Frame):
             has_selection: Whether there's a selection
         """
         self._update_button_states(has_selection)
+    
+    def update_undo_redo_state(self, can_undo, can_redo):
+        """
+        Update undo/redo button states.
+        
+        Args:
+            can_undo: Whether undo is available
+            can_redo: Whether redo is available
+        """
+        self.btn_undo.config(state="normal" if can_undo else "disabled")
+        self.btn_redo.config(state="normal" if can_redo else "disabled")
     
     def update_progress(self, question_count, expected_count):
         """
@@ -297,6 +312,24 @@ class ActionPanel(ttk.Frame):
         status = f"Questions: {question_count} / {expected_count}"
         self.stats_label.config(text=status, foreground=color)
     
+    def update_training_status(self, status_text=None):
+        """
+        Update the training status display.
+        
+        Args:
+            status_text: Training status text to display (None to hide)
+        """
+        if status_text:
+            self.training_status_var.set(status_text)
+            # Ensure the training frame is visible
+            if not self.training_frame.winfo_viewable():
+                self.training_frame.pack(fill=tk.X, pady=5)
+            self.update_idletasks()  # Force update
+        else:
+            # Hide the training frame
+            self.training_frame.pack_forget()
+            self.update_idletasks()  # Force update
+    
     def set_expected_count(self, count):
         """
         Set the expected question count.
@@ -321,6 +354,8 @@ class ActionPanel(ttk.Frame):
         self.progress_var.set(0)
         self.stats_label.config(text="Questions: 0 / 0")
         self._update_button_states(False)
+        self.update_undo_redo_state(False, False)
+        self.update_training_status(None)
     
     def _on_mark_question(self):
         """Handle mark as question button click."""
@@ -342,25 +377,20 @@ class ActionPanel(ttk.Frame):
         if callable(self.on_merge_up):
             self.on_merge_up()
     
-    def _on_multi_question(self):
-        """Handle mark all as question button click."""
-        if callable(self.on_multi_question):
-            self.on_multi_question()
-    
-    def _on_multi_answer(self):
-        """Handle mark all as answer button click."""
-        if callable(self.on_multi_answer):
-            self.on_multi_answer()
-    
-    def _on_multi_ignore(self):
-        """Handle mark all as ignore button click."""
-        if callable(self.on_multi_ignore):
-            self.on_multi_ignore()
-    
     def _on_set_expected_count(self):
         """Handle set expected count button click."""
         if callable(self.on_set_expected_count):
             self.on_set_expected_count()
+    
+    def _on_undo(self):
+        """Handle undo button click."""
+        if callable(self.on_undo):
+            self.on_undo()
+    
+    def _on_redo(self):
+        """Handle redo button click."""
+        if callable(self.on_redo):
+            self.on_redo()
     
     def _on_exit(self):
         """Handle exit button click."""

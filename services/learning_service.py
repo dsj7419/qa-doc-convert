@@ -739,13 +739,13 @@ class LearningService:
     def _train_model_thread(self, force: bool) -> None:
         """
         Thread function for background training.
-        
+    
         Args:
             force: Force training even if data hasn't changed
         """
         try:
             result = self._train_model_internal(force)
-            
+        
             # Check if this was a graceful stop (rather than a true failure)
             if result == self.GRACEFUL_STOP:
                 self._log_debug("Training thread detected graceful stop")

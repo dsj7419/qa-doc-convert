@@ -4,7 +4,7 @@ Header panel component.
 import tkinter as tk
 from tkinter import ttk
 
-from utils.theme import AppTheme, TkButton
+from utils.theme import AppTheme
 
 class HeaderPanel(ttk.Frame):
     """Header panel with logo and main controls."""
@@ -31,8 +31,6 @@ class HeaderPanel(ttk.Frame):
     
     def _init_ui(self):
         """Initialize UI elements."""
-        self.configure(style='Header.TFrame')
-        
         # Configure grid
         self.columnconfigure(0, weight=0)  # Logo/title
         self.columnconfigure(1, weight=1)  # Spacer
@@ -66,21 +64,21 @@ class HeaderPanel(ttk.Frame):
         buttons_frame.grid(row=0, column=2, columnspan=2, sticky="e")
         
         # Load Button
-        self.load_btn = TkButton(
+        self.load_btn = ttk.Button(
             buttons_frame,
             text="Load DOCX File",
             command=self._on_load_click,
-            style='primary',
+            style='Primary.TButton',
             width=15
         )
         self.load_btn.pack(side=tk.LEFT, padx=(0, 10))
         
         # Save Button
-        self.save_btn = TkButton(
+        self.save_btn = ttk.Button(
             buttons_frame,
             text="Save Corrected CSV",
             command=self._on_save_click,
-            style='primary',
+            style='Primary.TButton',
             width=20
         )
         self.save_btn.pack(side=tk.LEFT)

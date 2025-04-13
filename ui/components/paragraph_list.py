@@ -1,5 +1,5 @@
 """
-Paragraph list component with fixed button text color.
+Paragraph list component.
 """
 import tkinter as tk
 from tkinter import ttk
@@ -36,52 +36,48 @@ class ParagraphList(ttk.Frame):
         self.columnconfigure(0, weight=1)  # Main content
         self.columnconfigure(1, weight=0)  # Vertical scrollbar
         
-        # Document Paragraphs header with better contrast
+        # Document Paragraphs header
         header_container = ttk.Frame(self, style='TFrame')
         header_container.grid(row=0, column=0, sticky="ew", pady=(0, 5))
         
-        # Make the container visually distinct - use tk.Frame instead of ttk.Frame for direct color control
-        header_bg = tk.Frame(
-            header_container,
-            bg=AppTheme.COLORS['action_button_bg'],
-            padx=5,
-            pady=3
-        )
+        # Header with background
+        header_bg = ttk.Frame(header_container, style='Header.TFrame')
         header_bg.pack(fill=tk.X, expand=True)
         
-        # Document icon (simple character for now, could be replaced with an image)
-        doc_icon = tk.Label(
-            header_bg,
+        # Create header content with icon and text
+        header_content = ttk.Frame(header_bg, style='Header.TFrame')
+        header_content.pack(fill=tk.X, padx=5, pady=3)
+        
+        # Document icon
+        doc_icon = ttk.Label(
+            header_content,
             text="📄",  # Document emoji
-            font=("Segoe UI", 12),
-            fg="#ffffff",  # White for contrast
-            bg=AppTheme.COLORS['action_button_bg']
+            style='Header.TLabel',
+            font=("Segoe UI", 12)
         )
         doc_icon.pack(side=tk.LEFT, padx=(0, 8))
         
-        header_label = tk.Label(
-            header_bg,
+        header_label = ttk.Label(
+            header_content,
             text="Document Paragraphs:",
-            font=AppTheme.FONTS['bold'],
-            fg="#ffffff",  # White for contrast
-            bg=AppTheme.COLORS['action_button_bg']
+            style='Header.TLabel',
+            font=AppTheme.FONTS['bold']
         )
         header_label.pack(side=tk.LEFT)
         
-        # Filter frame with improved styling
+        # Filter frame
         filter_frame = ttk.Frame(self, style='TFrame')
         filter_frame.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         
-        # Filter label with better contrast - use tk.Frame for direct color control
-        filter_container = tk.Frame(filter_frame, bg=AppTheme.COLORS['action_button_bg'])
-        filter_container.pack(side=tk.LEFT, padx=(0, 8))
+        # Filter label with background
+        filter_bg = ttk.Frame(filter_frame, style='Header.TFrame')
+        filter_bg.pack(side=tk.LEFT, padx=(0, 8))
         
-        filter_label = tk.Label(
-            filter_container,
+        filter_label = ttk.Label(
+            filter_bg,
             text="Filter:",
-            font=AppTheme.FONTS['bold'],
-            fg="#ffffff",  # White text
-            bg=AppTheme.COLORS['action_button_bg']
+            style='Header.TLabel',
+            font=AppTheme.FONTS['bold']
         )
         filter_label.pack(side=tk.LEFT, padx=5, pady=3)
         
@@ -92,25 +88,17 @@ class ParagraphList(ttk.Frame):
         filter_entry = ttk.Entry(
             filter_frame,
             textvariable=self.filter_var,
-            width=20,
-            style='TEntry'
+            width=20
         )
         filter_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # DIRECT APPROACH: Use plain tk.Button
-        clear_btn = tk.Button(
+        # Clear button
+        clear_btn = ttk.Button(
             filter_frame,
             text="Clear",
             command=self._clear_filter,
-            bg=AppTheme.COLORS['action_button_bg'],
-            fg="#ffffff",  # FORCE WHITE TEXT
-            activebackground=AppTheme.COLORS['action_button_hover'],
-            activeforeground="#ffffff",  # WHITE TEXT ON HOVER
-            font=AppTheme.FONTS['normal'],
-            relief="raised",
-            borderwidth=1,
-            width=8,
-            cursor="hand2"
+            style='Action.TButton',
+            width=8
         )
         clear_btn.pack(side=tk.LEFT, padx=(8, 0))
         
@@ -128,7 +116,7 @@ class ParagraphList(ttk.Frame):
             highlightthickness=1,
             highlightbackground=AppTheme.COLORS['list_border'],
             highlightcolor=AppTheme.COLORS['accent'],
-            selectmode=tk.SINGLE  # Explicit single selection mode
+            selectmode=tk.EXTENDED  # Allow multiple selection
         )
         self.listbox.grid(row=2, column=0, sticky="nsew")
         
@@ -151,6 +139,10 @@ class ParagraphList(ttk.Frame):
         
         # Bind selection event
         self.listbox.bind('<<ListboxSelect>>', self._on_selection_change)
+        
+        # Add keyboard shortcuts for Undo/Redo
+        self.bind_all("<Control-z>", self._on_ctrl_z)
+        self.bind_all("<Control-y>", self._on_ctrl_y)
     
     def set_paragraphs(self, paragraphs: List[Paragraph]):
         """
@@ -223,6 +215,20 @@ class ParagraphList(ttk.Frame):
         # Call the selection callback if registered
         if callable(self.selection_callback):
             self.selection_callback()
+    
+    def _on_ctrl_z(self, event):
+        """Handle Ctrl+Z keyboard shortcut."""
+        # Find the parent window
+        parent = self.winfo_toplevel()
+        if hasattr(parent, 'event_generate'):
+            parent.event_generate("<<Undo>>")
+    
+    def _on_ctrl_y(self, event):
+        """Handle Ctrl+Y keyboard shortcut."""
+        # Find the parent window
+        parent = self.winfo_toplevel()
+        if hasattr(parent, 'event_generate'):
+            parent.event_generate("<<Redo>>")
     
     def set_selection_callback(self, callback: Callable[[], None]):
         """

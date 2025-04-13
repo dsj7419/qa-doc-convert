@@ -1,10 +1,13 @@
 """
 Theme configuration and styling for the application.
-Elegant dark-themed color scheme with enhanced readability and visual appeal.
+Elegant professional color scheme with enhanced readability and visual appeal.
 """
+import logging
 import tkinter as tk
 from tkinter import ttk
 import platform
+
+logger = logging.getLogger(__name__)
 
 class AppTheme:
     """Manages application theming and styling."""
@@ -15,27 +18,27 @@ class AppTheme:
         'primary': "#1e3a5f",      # Rich navy blue
         'secondary': "#2d4a6d",    # Medium navy
         'accent': "#5d9cec",       # Vibrant blue - for emphasis
-        'success': "#53b983",      # Soft green - less harsh
+        'success': "#53b983",      # Soft green
         'warning': "#fcb941",      # Soft orange
         'danger': "#f06060",       # Soft red
         'light': "#f5f6fa",        # Off-white
-        'dark': "#2b333e",         # Dark slate - nearly black
+        'dark': "#2b333e",         # Dark slate
         
-        # UI element colors - main interface
-        'bg': "#f0f4f8",           # Very light blue-gray background
+        # UI element colors
+        'bg': "#f0f4f8",           # Light blue-gray background
         'header_bg': "#1e3a5f",    # Rich navy header
         'header_fg': "#ffffff",    # White text for headers
         
         # Button colors
-        'button_bg': "#456789",    # Darker blue for better contrast
-        'button_fg': "#ffffff",    # White text
+        'button_bg': "#456789",    # Default button background
+        'button_fg': "#ffffff",    # Default button foreground (white)
         'button_hover': "#5d7799", # Lighter on hover
-        'action_button_bg': "#2d567d", # Darker blue for actions
-        'action_button_fg': "#ffffff", # White text
-        'action_button_hover': "#3d6897", # Lighter on hover
-        'exit_bg': "#c13636",      # Darker red for better contrast
-        'exit_fg': "#ffffff",      # White text
-        'exit_hover': "#d84545",   # Lighter on hover
+        'action_button_bg': "#2d567d", # Action button background
+        'action_button_fg': "#ffffff", # Action button foreground
+        'action_button_hover': "#3d6897", # Action button hover
+        'exit_bg': "#c13636",      # Exit button background
+        'exit_fg': "#ffffff",      # Exit button foreground
+        'exit_hover': "#d84545",   # Exit button hover
         
         # List and selection colors
         'list_bg': '#ffffff',      # White
@@ -96,6 +99,8 @@ class AppTheme:
         # Configure ttk styles
         cls._configure_ttk_styles(style)
         
+        logger.info("Theme configured successfully")
+    
     @classmethod
     def _setup_fonts(cls):
         """Set up fonts based on the platform."""
@@ -120,283 +125,84 @@ class AppTheme:
     
     @classmethod
     def _configure_ttk_styles(cls, style):
-        """Configure ttk widget styles for an elegant professional look."""
-        # TButton style - more refined with slight 3D effect
-        style.configure(
-            'TButton',
-            background=cls.COLORS['button_bg'],
-            foreground=cls.COLORS['button_fg'],
-            font=cls.FONTS['normal'],
-            padding=(12, 6),
-            relief="raised",
-            borderwidth=1
-        )
-        style.map('TButton',
-            background=[('active', cls.COLORS['button_hover'])],
-            relief=[('pressed', 'sunken')]
-        )
+        """Configure ttk widget styles for a consistent professional look."""
+        # Configure TFrame
+        style.configure('TFrame', background=cls.COLORS['bg'])
+        style.configure('Header.TFrame', background=cls.COLORS['header_bg'])
         
-        # Primary Button style
-        style.configure(
-            'Primary.TButton',
-            background=cls.COLORS['button_bg'],
-            foreground=cls.COLORS['button_fg'],
-            font=cls.FONTS['bold'],
-            padding=(12, 6)
-        )
+        # Configure TLabel
+        style.configure('TLabel', 
+                        background=cls.COLORS['bg'], 
+                        font=cls.FONTS['normal'])
+        
+        style.configure('Header.TLabel', 
+                        background=cls.COLORS['header_bg'],
+                        foreground=cls.COLORS['header_fg'],
+                        font=cls.FONTS['title'])
+        
+        # Configure TButton styles
+        # Default button
+        style.configure('TButton', 
+                        font=cls.FONTS['normal'],
+                        padding=(12, 6))
+        
+        # Primary button (blue)
+        style.configure('Primary.TButton', 
+                        font=cls.FONTS['bold'])
         style.map('Primary.TButton',
-            background=[('active', cls.COLORS['button_hover'])],
-            relief=[('pressed', 'sunken')]
-        )
+                  background=[('active', cls.COLORS['button_hover']),
+                              ('!disabled', cls.COLORS['button_bg'])],
+                  foreground=[('!disabled', cls.COLORS['button_fg'])])
         
-        # Action Button style (blue)
-        style.configure(
-            'Action.TButton',
-            background=cls.COLORS['action_button_bg'],
-            foreground=cls.COLORS['action_button_fg'],
-            font=cls.FONTS['normal'],
-            padding=(12, 6)
-        )
+        # Action button (darker blue)
+        style.configure('Action.TButton', 
+                        font=cls.FONTS['normal'])
         style.map('Action.TButton',
-            background=[('active', cls.COLORS['action_button_hover'])],
-            relief=[('pressed', 'sunken')]
-        )
-        
-        # Danger Button style (red)
-        style.configure(
-            'Danger.TButton',
-            background=cls.COLORS['exit_bg'],
-            foreground=cls.COLORS['exit_fg'],
-            font=cls.FONTS['normal'],
-            padding=(12, 6)
-        )
+                  background=[('active', cls.COLORS['action_button_hover']),
+                              ('!disabled', cls.COLORS['action_button_bg'])],
+                  foreground=[('!disabled', cls.COLORS['action_button_fg'])])
+                  
+        # Danger button (red)
+        style.configure('Danger.TButton', 
+                        font=cls.FONTS['normal'])
         style.map('Danger.TButton',
-            background=[('active', cls.COLORS['exit_hover'])],
-            relief=[('pressed', 'sunken')]
-        )
+                  background=[('active', cls.COLORS['exit_hover']),
+                              ('!disabled', cls.COLORS['exit_bg'])],
+                  foreground=[('!disabled', cls.COLORS['exit_fg'])])
+                  
+        # Small action button
+        style.configure('Small.Action.TButton',
+                        font=cls.FONTS['normal'],
+                        padding=(6, 3))
+        style.map('Small.Action.TButton',
+                  background=[('active', cls.COLORS['action_button_hover']),
+                              ('!disabled', cls.COLORS['action_button_bg'])],
+                  foreground=[('!disabled', cls.COLORS['action_button_fg'])])
         
-        # TFrame
-        style.configure(
-            'TFrame',
-            background=cls.COLORS['bg']
-        )
+        # White on blue button (for header)
+        style.configure('Header.TButton',
+                        font=cls.FONTS['normal'],
+                        background=cls.COLORS['header_bg'],
+                        foreground=cls.COLORS['header_fg'])
+        style.map('Header.TButton',
+                  background=[('active', cls.COLORS['button_hover']),
+                              ('!disabled', cls.COLORS['button_bg'])],
+                  foreground=[('!disabled', cls.COLORS['button_fg'])])
         
-        # TLabel
-        style.configure(
-            'TLabel',
-            background=cls.COLORS['bg'],
-            font=cls.FONTS['normal']
-        )
-        
-        # Header Label
-        style.configure(
-            'Header.TLabel',
-            background=cls.COLORS['header_bg'],
-            foreground=cls.COLORS['header_fg'],
-            font=cls.FONTS['title']
-        )
-        
-        # Header Frame
-        style.configure(
-            'Header.TFrame',
-            background=cls.COLORS['header_bg']
-        )
-        
-        # TProgressbar - more elegant progress bar
-        style.configure(
-            "TProgressbar",
-            troughcolor=cls.COLORS['progress_bg'],
-            background=cls.COLORS['progress_fg'],
-            thickness=8,
-            borderwidth=0
-        )
-        
-        # TEntry - improved entry fields
-        style.configure(
-            "TEntry",
-            fieldbackground=cls.COLORS['input_bg'],
-            bordercolor=cls.COLORS['input_border'],
-            padding=5
-        )
+        # Configure TEntry
+        style.configure('TEntry', 
+                        fieldbackground=cls.COLORS['input_bg'],
+                        font=cls.FONTS['normal'],
+                        padding=5)
         style.map('TEntry',
-            bordercolor=[('focus', cls.COLORS['accent'])]
-        )
+                  fieldbackground=[('disabled', cls.COLORS['bg'])])
         
-        # TSeparator
-        style.configure(
-            "TSeparator",
-            background=cls.COLORS['separator']
-        )
-
-class TkButton(tk.Button):
-    """Custom button class with elegant styling and forced text colors."""
-    
-    def __init__(self, parent, text, command=None, style='primary', **kwargs):
-        """
-        Initialize a custom button with forced text coloring.
+        # Configure TProgressbar
+        style.configure("TProgressbar",
+                        troughcolor=cls.COLORS['progress_bg'],
+                        background=cls.COLORS['progress_fg'],
+                        thickness=8)
         
-        Args:
-            parent: Parent widget
-            text: Button text
-            command: Button command
-            style: Button style ('primary', 'action', 'danger')
-            **kwargs: Additional Button parameters
-        """
-        self.style = style
-        
-        # Explicitly force white text for all buttons, regardless of style
-        fg_color = "#ffffff"
-        
-        # Define colors based on style
-        if style == 'primary':
-            bg_color = AppTheme.COLORS['button_bg']
-            hover_bg = AppTheme.COLORS['button_hover']
-        elif style == 'action':
-            bg_color = AppTheme.COLORS['action_button_bg']
-            hover_bg = AppTheme.COLORS['action_button_hover']
-        elif style == 'danger':
-            bg_color = AppTheme.COLORS['exit_bg']
-            hover_bg = AppTheme.COLORS['exit_hover']
-        else:
-            bg_color = AppTheme.COLORS['light']
-            hover_bg = self._darken_color(bg_color)
-        
-        # Create a new kwargs dictionary to avoid modifying the original
-        new_kwargs = kwargs.copy()
-        
-        # Explicitly set all style properties, overriding any provided values
-        new_kwargs['bg'] = bg_color
-        new_kwargs['fg'] = fg_color  # FORCE white text
-        new_kwargs['activebackground'] = hover_bg
-        new_kwargs['activeforeground'] = fg_color  # FORCE white text during clicks
-        new_kwargs['font'] = AppTheme.FONTS['normal']
-        new_kwargs['highlightthickness'] = 0
-        new_kwargs['borderwidth'] = 1
-        new_kwargs['relief'] = 'raised'
-        new_kwargs['cursor'] = 'hand2'
-        
-        # Initialize with forced settings
-        super().__init__(parent, text=text, command=command, **new_kwargs)
-        
-        # CRITICAL: Force text color again after initialization
-        self.config(fg=fg_color)
-        
-        # Store original colors for hover effects
-        self._original_bg = bg_color
-        self._original_fg = fg_color
-        
-        # Bind hover events for visual feedback
-        self.bind("<Enter>", self._on_enter)
-        self.bind("<Leave>", self._on_leave)
-        
-        # Bind press events for visual feedback
-        self.bind("<ButtonPress-1>", self._on_press)
-        self.bind("<ButtonRelease-1>", self._on_release)
-        
-        # Add subtle rounding effect through relief and borderwidth
-        if platform.system() == 'Windows':
-            # Windows looks better with slightly different settings
-            self.config(relief="ridge", borderwidth=1)
-        else:
-            # Default for other platforms
-            self.config(relief="raised", borderwidth=1)
-    
-    def _on_enter(self, event):
-        """Handle mouse enter event."""
-        # Change background color on hover
-        if self.style == 'primary':
-            self.config(background=AppTheme.COLORS['button_hover'])
-        elif self.style == 'action':
-            self.config(background=AppTheme.COLORS['action_button_hover'])
-        elif self.style == 'danger':
-            self.config(background=AppTheme.COLORS['exit_hover'])
-        
-        # Ensure text remains white during hover
-        self.config(fg="#ffffff")
-        
-        # Store current font for restoration
-        current_font = self.cget('font')
-        if isinstance(current_font, str):
-            # Skip if font is a string name
-            return
-        self._original_font = current_font
-    
-    def _on_leave(self, event):
-        """Handle mouse leave event."""
-        # Restore original background color
-        if self.style == 'primary':
-            self.config(background=AppTheme.COLORS['button_bg'])
-        elif self.style == 'action':
-            self.config(background=AppTheme.COLORS['action_button_bg'])
-        elif self.style == 'danger':
-            self.config(background=AppTheme.COLORS['exit_bg'])
-        
-        # CRITICAL: Force text to white when mouse leaves
-        self.config(fg="#ffffff")
-        
-        # Restore original font
-        if hasattr(self, '_original_font'):
-            self.config(font=self._original_font)
-    
-    def _on_press(self, event):
-        """Handle button press event."""
-        self.config(relief="sunken")
-        # Ensure text remains white during press
-        self.config(fg="#ffffff")
-    
-    def _on_release(self, event):
-        """Handle button release event."""
-        if platform.system() == 'Windows':
-            self.config(relief="ridge")
-        else:
-            self.config(relief="raised")
-        
-        # CRITICAL: Force text to white when button is released
-        self.config(fg="#ffffff")
-        
-        # Also restore background color
-        self._on_leave(event)
-    
-    @staticmethod
-    def _darken_color(hex_color, factor=0.8):
-        """
-        Darken a hex color by a factor.
-        
-        Args:
-            hex_color: Hex color string
-            factor: Darkening factor (0-1)
-            
-        Returns:
-            Darkened hex color string
-        """
-        r = int(hex_color[1:3], 16)
-        g = int(hex_color[3:5], 16)
-        b = int(hex_color[5:7], 16)
-        
-        r = int(r * factor)
-        g = int(g * factor)
-        b = int(b * factor)
-        
-        return f"#{r:02x}{g:02x}{b:02x}"
-    
-    @staticmethod
-    def _darken_color(hex_color, factor=0.8):
-        """
-        Darken a hex color by a factor.
-        
-        Args:
-            hex_color: Hex color string
-            factor: Darkening factor (0-1)
-            
-        Returns:
-            Darkened hex color string
-        """
-        r = int(hex_color[1:3], 16)
-        g = int(hex_color[3:5], 16)
-        b = int(hex_color[5:7], 16)
-        
-        r = int(r * factor)
-        g = int(g * factor)
-        b = int(b * factor)
-        
-        return f"#{r:02x}{g:02x}{b:02x}"
+        # Configure TSeparator
+        style.configure('TSeparator',
+                        background=cls.COLORS['separator'])

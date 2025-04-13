@@ -12,6 +12,8 @@ from services.file_service import FileService
 from ui.interfaces import IMainWindowView
 from utils.config_manager import ConfigManager
 from services.learning_service import LearningService
+from commands.command_manager import CommandManager
+from commands.document_commands import ChangeRoleCommand, MergeParagraphCommand, SetExpectedCountCommand
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,14 @@ class MainPresenter:
         self.root = root
         self.config_manager = config_manager or ConfigManager()
         self.learning_service = LearningService()
+        
+        # Command manager for undo/redo
+        self.command_manager = CommandManager()
+    
+        # Bind to custom events
+        if hasattr(root, 'bind'):
+            root.bind("<<Undo>>", lambda e: self.undo_requested())
+            root.bind("<<Redo>>", lambda e: self.redo_requested())
     
     def initialize(self) -> None:
         """Initialize the presenter."""
@@ -43,6 +53,13 @@ class MainPresenter:
         # Reset UI state
         self.view.reset_ui()
         self.document = Document(self.config_manager)
+        
+        # Clear command history
+        self.command_manager.clear()
+        
+        # Update undo/redo button states
+        if hasattr(self.view, 'action_panel') and hasattr(self.view.action_panel, 'update_undo_redo_state'):
+            self.view.action_panel.update_undo_redo_state(False, False)
         
         # Get file path from dialog
         file_path = FileService.select_docx_file()
@@ -170,6 +187,16 @@ class MainPresenter:
                 train_attempt = True
                 if success:
                     self.view.log_message("AI model training started in background", level="INFO")
+                    
+                    # Start a periodic update for training status
+                    def update_status():
+                        self.update_training_status()
+                        # Schedule next update if training is still in progress
+                        if self.learning_service.get_training_status()['is_training']:
+                            self.root.after(1000, update_status)  # Update every second
+                    
+                    # Start the first update
+                    self.root.after(500, update_status)
                 else:
                     self.view.log_message("Failed to start AI model training - check logs for details", level="WARNING")
             elif examples_added > 0:
@@ -208,6 +235,35 @@ class MainPresenter:
                 "Save Failed",
                 "Failed to save training data. Check the logs for details."
             )
+    
+    def undo_requested(self) -> None:
+        """Handle undo request."""
+        if self.command_manager.undo():
+            # Update UI
+            self.view.display_paragraphs(self.document.paragraphs)
+            self._update_stats()
+            
+            # Update undo/redo button states
+            if hasattr(self.view, 'action_panel') and hasattr(self.view.action_panel, 'update_undo_redo_state'):
+                self.view.action_panel.update_undo_redo_state(
+                    self.command_manager.can_undo(),
+                    self.command_manager.can_redo()
+                )
+
+    def redo_requested(self) -> None:
+        """Handle redo request."""
+        if self.command_manager.redo():
+            # Update UI
+            self.view.display_paragraphs(self.document.paragraphs)
+            self._update_stats()
+            
+            # Update undo/redo button states
+            if hasattr(self.view, 'action_panel') and hasattr(self.view.action_panel, 'update_undo_redo_state'):
+                self.view.action_panel.update_undo_redo_state(
+                    self.command_manager.can_undo(),
+                    self.command_manager.can_redo()
+                )
+    
     def toggle_manual_training_mode_requested(self) -> None:
         """Toggle manual training mode."""
         # Toggle the mode
@@ -611,11 +667,9 @@ class MainPresenter:
                 if idx not in self._initial_roles:
                     self._initial_roles[idx] = self.document.paragraphs[idx].role
         
-        # Now make the changes
-        needs_renumber = False
-        for idx in selected_indices:
-            if self.document.change_paragraph_role(idx, new_role):
-                needs_renumber = True
+        # Create and execute command
+        command = ChangeRoleCommand(self.document, selected_indices, new_role)
+        self.command_manager.execute(command)
         
         # Add training examples ONLY for paragraphs where the role changed from the initial analysis
         examples_added = 0
@@ -631,12 +685,16 @@ class MainPresenter:
         if examples_added > 0:
             self.view.log_message(f"Added {examples_added} examples from your corrections", level="INFO")
         
-        if needs_renumber:
-            self.document.renumber_questions()
-            
         # Refresh UI
         self.view.display_paragraphs(self.document.paragraphs)
         self._update_stats()
+        
+        # Update undo/redo button states
+        if hasattr(self.view, 'action_panel') and hasattr(self.view.action_panel, 'update_undo_redo_state'):
+            self.view.action_panel.update_undo_redo_state(
+                self.command_manager.can_undo(),
+                self.command_manager.can_redo()
+            )
     
     def merge_up_requested(self) -> None:
         """Handle merge up requests."""
@@ -650,27 +708,20 @@ class MainPresenter:
         
         self.view.log_message(f"Attempting to merge {len(selected_indices)} paragraph(s) into previous answer.")
         
-        needs_renumber = False
-        merged_count = 0
-        
-        # Process in order (sort indices)
-        for idx in sorted(selected_indices):
-            if idx == 0:
-                self.view.log_message(f"Cannot merge up paragraph at index 0.", level="WARNING")
-                continue  # Cannot merge the very first paragraph
-            
-            if self.document.merge_paragraph_up(idx):
-                needs_renumber = True
-                merged_count += 1
-        
-        if merged_count == 0:
-            self.view.show_info("Merge", "No paragraphs could be merged. Please ensure the selected paragraphs have a preceding question or answer.")
-        elif needs_renumber:
-            self.document.renumber_questions()
+        # Create and execute command
+        command = MergeParagraphCommand(self.document, selected_indices)
+        self.command_manager.execute(command)
         
         # Refresh UI
         self.view.display_paragraphs(self.document.paragraphs)
         self._update_stats()
+        
+        # Update undo/redo button states
+        if hasattr(self.view, 'action_panel') and hasattr(self.view.action_panel, 'update_undo_redo_state'):
+            self.view.action_panel.update_undo_redo_state(
+                self.command_manager.can_undo(),
+                self.command_manager.can_redo()
+            )
 
     def show_training_progress(self) -> None:
         """Show a message about current training progress."""
@@ -704,10 +755,20 @@ class MainPresenter:
             if new_count <= 0:
                 self.view.show_warning("Invalid Count", "Please enter a positive number of questions.")
                 return
-                
-            self.document.set_expected_question_count(new_count)
+            
+            # Create and execute command
+            command = SetExpectedCountCommand(self.document, new_count)
+            self.command_manager.execute(command)
+            
             self.view.log_message(f"Expected question count manually set to {new_count}")
             self._update_stats()
+            
+            # Update undo/redo button states
+            if hasattr(self.view, 'action_panel') and hasattr(self.view.action_panel, 'update_undo_redo_state'):
+                self.view.action_panel.update_undo_redo_state(
+                    self.command_manager.can_undo(),
+                    self.command_manager.can_redo()
+                )
         except ValueError:
             self.view.show_warning("Invalid Input", "Please enter a valid number.")
     
@@ -783,6 +844,17 @@ class MainPresenter:
             logger.error(f"Error during exit handling: {e}", exc_info=True)
             # Exit anyway - force destroy after a brief delay
             self.root.after(100, self.root.destroy)
+    
+    def update_training_status(self) -> None:
+        """Update the training status display."""
+        if hasattr(self.learning_service, 'get_training_status'):
+            status = self.learning_service.get_training_status()
+            if status['is_training']:
+                progress = status.get('progress', {})
+                status_msg = progress.get('message', 'Training in progress...')
+                self.view.action_panel.update_training_status(status_msg)
+            else:
+                self.view.action_panel.update_training_status(None)
     
     def _update_stats(self) -> None:
         """Update statistics display."""

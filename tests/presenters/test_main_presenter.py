@@ -47,11 +47,17 @@ class TestMainPresenter:
     
     def test_exit_requested(self, presenter, mock_root):
         """Test the exit_requested method."""
+        # Mock the learning service properties to indicate no training in progress
+        presenter.learning_service = MagicMock()
+        presenter.learning_service.get_training_stats.return_value = {'is_training': False}
+        
         # Act
         presenter.exit_requested()
         
         # Assert
-        mock_root.quit.assert_called_once()
+        # Now we're using after(100, destroy) instead of quit
+        mock_root.after.assert_called_once()
+        assert mock_root.after.call_args[0][1] == mock_root.destroy
     
     def test_paragraph_selection_changed_with_selection(self, presenter, mock_view):
         """Test paragraph_selection_changed with selection."""
@@ -123,3 +129,38 @@ class TestMainPresenter:
         # Assert
         mock_document.set_expected_question_count.assert_not_called()
         mock_view.show_warning.assert_called_once()
+
+    def test_update_training_status_active(self, presenter, mock_view):
+        """Test update_training_status with active training."""
+        # Mock learning service
+        presenter.learning_service = MagicMock()
+        presenter.learning_service.get_training_status.return_value = {
+            'is_training': True,
+            'progress': {'message': 'Training in progress: Epoch 2/5'}
+        }
+        
+        # Mock view's action panel
+        mock_view.action_panel = MagicMock()
+        
+        # Call method
+        presenter.update_training_status()
+        
+        # Verify action panel was updated
+        mock_view.action_panel.update_training_status.assert_called_once_with('Training in progress: Epoch 2/5')
+
+    def test_update_training_status_inactive(self, presenter, mock_view):
+        """Test update_training_status with inactive training."""
+        # Mock learning service
+        presenter.learning_service = MagicMock()
+        presenter.learning_service.get_training_status.return_value = {
+            'is_training': False
+        }
+        
+        # Mock view's action panel
+        mock_view.action_panel = MagicMock()
+        
+        # Call method
+        presenter.update_training_status()
+        
+        # Verify action panel was updated to clear status
+        mock_view.action_panel.update_training_status.assert_called_once_with(None)

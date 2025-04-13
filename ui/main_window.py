@@ -128,7 +128,7 @@ class MainWindow(IMainWindowView, IParagraphListView):
         action_frame = ttk.Frame(main_frame, width=250)
         action_frame.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
         action_frame.grid_propagate(False)  # Prevent resizing
-        
+
         self.action_panel = ActionPanel(
             action_frame,
             on_mark_question=lambda: self._on_change_role(ParaRole.QUESTION),
@@ -136,7 +136,9 @@ class MainWindow(IMainWindowView, IParagraphListView):
             on_mark_ignore=lambda: self._on_change_role(ParaRole.IGNORE),
             on_merge_up=self._on_merge_up,
             on_set_expected_count=self._on_set_expected_count,
-            on_exit=self._on_exit
+            on_exit=self._on_exit,
+            on_undo=self._on_undo,
+            on_redo=self._on_redo
         )
         self.action_panel.pack(fill=tk.BOTH, expand=True)
         
@@ -358,6 +360,16 @@ class MainWindow(IMainWindowView, IParagraphListView):
             enabled: Whether actions should be enabled
         """
         self.action_panel.update_selection_state(enabled)
+
+    def _on_undo(self):
+        """Handle undo button click."""
+        if self.presenter:
+            self.presenter.undo_requested()
+
+    def _on_redo(self):
+        """Handle redo button click."""
+        if self.presenter:
+            self.presenter.redo_requested()
     
     def reset_ui(self) -> None:
         """Reset the UI state."""
