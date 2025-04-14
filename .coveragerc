@@ -1,0 +1,28 @@
+# File: .coveragerc
+[run]
+source = 
+    commands
+    models
+    presenters
+    services
+    ui
+    utils
+
+omit =
+    */tests/*
+    */scripts/*
+    */__init__.py
+    */main.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+    raise ImportError
+    except ImportError
+
+[html]
+directory = coverage_html_report

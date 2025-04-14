@@ -39,6 +39,11 @@ class MainWindow(IMainWindowView, IParagraphListView):
         # Presenter reference - will be set by main.py
         self.presenter = None
         
+        # Bind to custom events
+        if hasattr(root, 'bind'):
+            root.bind("<<Undo>>", lambda e: self._on_undo())
+            root.bind("<<Redo>>", lambda e: self._on_redo())
+        
         # Build UI
         self._build_ui()
     

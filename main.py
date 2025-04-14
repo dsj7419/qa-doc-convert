@@ -7,6 +7,7 @@ import logging
 import os
 import sys
 import tkinter as tk
+import atexit
 
 from models.document import Document
 from presenters.main_presenter import MainPresenter
@@ -14,6 +15,17 @@ from ui.main_window import MainWindow
 from utils.logging_setup import setup_logging
 from utils.theme import AppTheme
 from utils.config_manager import ConfigManager
+from learning_service_fix import apply_fix
+
+# Import the new PyInstaller fix
+try:
+    from pyinstaller_transformer_fix import setup_transformer_temp_dirs, cleanup_transformer_temp_dirs
+except ImportError:
+    # Create stub functions if the module isn't available
+    def setup_transformer_temp_dirs():
+        return None
+    def cleanup_transformer_temp_dirs(temp_dir):
+        pass
 
 def main():
     """Main application entry point."""
@@ -21,6 +33,35 @@ def main():
     setup_logging()
     logger = logging.getLogger(__name__)
 
+    # Setup PyInstaller-specific temporary directories
+    temp_dir = setup_transformer_temp_dirs()
+    if temp_dir:
+        logger.info(f"Set up PyInstaller transformer temp dir: {temp_dir}")
+        # Register cleanup on exit
+        atexit.register(cleanup_transformer_temp_dirs, temp_dir)
+
+    # Apply the directory fix for learning service
+    try:
+        apply_fix()
+        logger.info("Applied learning service directory fix")
+    except Exception as e:
+        logger.warning(f"Could not apply learning service fix: {e}")
+
+    # Configure environment variables for Hugging Face libraries
+    # These help reduce file locking and permissions issues
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Disable parallelism to avoid deadlocks
+    
+    # Set a custom HTTP timeout for downloading models to avoid hanging
+    os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "300"  # 5 minutes timeout
+    
+    # Log current environment for debugging
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"APPDATA location: {os.environ.get('APPDATA', 'Not set')}")
+    logger.info(f"HF_HOME: {os.environ.get('HF_HOME', 'Not set')}")
+    logger.info(f"TRANSFORMERS_CACHE: {os.environ.get('TRANSFORMERS_CACHE', 'Not set')}")
+    
+    # Now proceed with normal application startup
     config_manager = ConfigManager()
     config = config_manager.get_config()
     

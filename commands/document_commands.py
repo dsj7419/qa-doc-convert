@@ -41,8 +41,9 @@ class ChangeRoleCommand(Command):
         # Change roles
         self.needs_renumber = False
         for idx in self.indices:
-            if self.document.change_paragraph_role(idx, self.new_role):
-                self.needs_renumber = True
+            if 0 <= idx < len(self.document.paragraphs):  # Add bounds check
+                if self.document.change_paragraph_role(idx, self.new_role):
+                    self.needs_renumber = True
         
         # Renumber if needed
         if self.needs_renumber:
@@ -51,19 +52,21 @@ class ChangeRoleCommand(Command):
         # Additional fix: If we're setting to ANSWER role, ensure q_num is set properly
         if self.new_role == ParaRole.ANSWER:
             for idx in sorted(self.indices):
-                if self.document.paragraphs[idx].q_num is None:
-                    # Find the nearest preceding question number
-                    q_num = None
-                    for i in range(idx-1, -1, -1):
-                        if (self.document.paragraphs[i].role == ParaRole.QUESTION or 
-                            self.document.paragraphs[i].role == ParaRole.ANSWER) and \
-                        self.document.paragraphs[i].q_num is not None:
-                            q_num = self.document.paragraphs[i].q_num
-                            break
-                    
-                    if q_num is not None:
-                        # Assign the found question number
-                        self.document.paragraphs[idx].q_num = q_num
+                if 0 <= idx < len(self.document.paragraphs):  # Add bounds check
+                    if self.document.paragraphs[idx].q_num is None:
+                        # Find the nearest preceding question number
+                        q_num = None
+                        for i in range(idx-1, -1, -1):
+                            if 0 <= i < len(self.document.paragraphs) and (  # Add bounds check 
+                                self.document.paragraphs[i].role == ParaRole.QUESTION or 
+                                self.document.paragraphs[i].role == ParaRole.ANSWER) and \
+                                self.document.paragraphs[i].q_num is not None:
+                                q_num = self.document.paragraphs[i].q_num
+                                break
+                        
+                        if q_num is not None:
+                            # Assign the found question number
+                            self.document.paragraphs[idx].q_num = q_num
     
     def undo(self) -> None:
         """Undo the command."""
@@ -115,8 +118,9 @@ class MergeParagraphCommand(Command):
                 logger.warning(f"Cannot merge up paragraph at index 0.")
                 continue  # Cannot merge the very first paragraph
             
-            if self.document.merge_paragraph_up(idx):
-                self.needs_renumber = True
+            if 0 <= idx < len(self.document.paragraphs):  # Add bounds check
+                if self.document.merge_paragraph_up(idx):
+                    self.needs_renumber = True
         
         # Renumber if needed
         if self.needs_renumber:
@@ -129,11 +133,12 @@ class MergeParagraphCommand(Command):
         # Restore old states
         needs_renumber = False
         for idx, state in self.old_states.items():
-            if self.document.paragraphs[idx].role != state['role']:
-                if self.document.change_paragraph_role(idx, state['role']):
-                    needs_renumber = True
-                # Manually restore q_num
-                self.document.paragraphs[idx].q_num = state['q_num']
+            if 0 <= idx < len(self.document.paragraphs):  # Add bounds check
+                if self.document.paragraphs[idx].role != state['role']:
+                    if self.document.change_paragraph_role(idx, state['role']):
+                        needs_renumber = True
+                    # Manually restore q_num
+                    self.document.paragraphs[idx].q_num = state['q_num']
         
         # Renumber if needed
         if needs_renumber or self.needs_renumber:

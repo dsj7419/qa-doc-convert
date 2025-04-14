@@ -47,3 +47,6 @@ resources/qa_classifier.pkl
 resources/fine_tuned_model/
 resources/qa_classifier.onnx
 *.onnx
+
+# installers
+installer/

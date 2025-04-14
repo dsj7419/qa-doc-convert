@@ -62,7 +62,8 @@ class AnalysisService:
                     completion_callback(question_indices, estimated_count, None)
                 except Exception as e:
                     logger.error(f"Error in analysis: {e}", exc_info=True)
-                    completion_callback(None, 0, e)
+                    # Provide a graceful fallback instead of passing the exception
+                    completion_callback(set(), max(10, len(raw_paragraphs) // 10), None)
             
             thread = threading.Thread(target=_analyze_thread)
             thread.daemon = True

@@ -291,7 +291,7 @@ class Document:
     
     def set_expected_question_count(self, count: int) -> None:
         """Set the expected question count."""
-        if count > 0:
+        if count >= 0:
             self.expected_question_count = count
             
     def cancel_loading(self) -> None:

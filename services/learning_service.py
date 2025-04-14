@@ -824,7 +824,7 @@ class LearningService:
 
     def _train_model_internal(self, force: bool) -> bool:
         """
-        Internal implementation of model training.
+        Internal implementation of model training with improved error handling.
 
         Args:
             force: Force training even if data hasn't changed
@@ -841,6 +841,34 @@ class LearningService:
             self._update_training_journal("in_progress", epoch=0, batch=0)
             if self.training_callback:
                 self.training_callback("Preparing training data", "INFO")
+
+            # Debug info: log current directory and environment variables 
+            self._log_debug(f"Current working directory: {os.getcwd()}")
+            self._log_debug(f"HF_HOME: {os.environ.get('HF_HOME', 'Not set')}")
+            self._log_debug(f"TRANSFORMERS_CACHE: {os.environ.get('TRANSFORMERS_CACHE', 'Not set')}")
+            self._log_debug(f"TORCH_HOME: {os.environ.get('TORCH_HOME', 'Not set')}")
+            
+            # Verify all necessary directories exist and are writable
+            directories = [
+                self.user_data_dir,
+                self.fine_tuned_model_dir,
+                self.checkpoint_dir,
+                os.path.join(self.user_data_dir, "training_logs")
+            ]
+            for directory in directories:
+                try:
+                    os.makedirs(directory, exist_ok=True)
+                    # Test write access
+                    test_file = os.path.join(directory, "test_write.tmp")
+                    with open(test_file, 'w') as f:
+                        f.write("test")
+                    os.remove(test_file)
+                    self._log_debug(f"Directory verified writable: {directory}")
+                except Exception as e:
+                    self._log_debug(f"CRITICAL ERROR: Directory not writable: {directory}, error: {e}")
+                    if self.training_callback:
+                        self.training_callback(f"Error with directory permissions: {directory}", "ERROR")
+                    return False
 
             # Prepare training data
             texts = []
@@ -1027,32 +1055,55 @@ class LearningService:
                     
                     return control
 
-            # Define training arguments
+            # IMPROVED: Define training arguments with absolute paths
+            # Force the directories to be absolute paths
+            checkpoint_dir_abs = os.path.abspath(self.checkpoint_dir)
+            logging_dir_abs = os.path.abspath(os.path.join(self.user_data_dir, "training_logs"))
+            
+            self._log_debug(f"Using absolute paths for training: checkpoint_dir={checkpoint_dir_abs}, logging_dir={logging_dir_abs}")
+            
+            # Create these dirs again with absolute paths
+            os.makedirs(checkpoint_dir_abs, exist_ok=True)
+            os.makedirs(logging_dir_abs, exist_ok=True)
+            
             training_args = TrainingArguments(
-                output_dir=self.checkpoint_dir,
-                num_train_epochs=5,  # Increased from 3 to ensure we continue training
+                output_dir=checkpoint_dir_abs,
+                num_train_epochs=5,
                 per_device_train_batch_size=8,
                 learning_rate=5e-5,
-                logging_dir=os.path.join(self.user_data_dir, "training_logs"),
+                logging_dir=logging_dir_abs,
                 logging_steps=10,
                 save_strategy="steps",
                 save_steps=10,
                 save_total_limit=3,
                 load_best_model_at_end=False,
-                report_to="none",
-                # Important: Disable past metrics tracking to avoid epoch confusion
-                disable_tqdm=False,  # Show progress bars
+                report_to="none",  # Disable reporting to avoid additional file writing
+                disable_tqdm=True,  # Disable progress bars for non-interactive environments
                 remove_unused_columns=True,
+                # Add explicit no_cuda for PyInstaller compatibility
+                no_cuda=not torch.cuda.is_available(),
             )
+            
+            # Log the training arguments
+            self._log_debug(f"Training arguments: {training_args}")
 
             # Create Trainer with our stoppable callback
             callback_instance = StoppableCheckpointCallback(self)
-            trainer = Trainer(
-                model=model,
-                args=training_args,
-                train_dataset=tokenized_dataset,
-                callbacks=[callback_instance]
-            )
+            
+            # Additional try-except for catching specific trainer init errors
+            try:
+                trainer = Trainer(
+                    model=model,
+                    args=training_args,
+                    train_dataset=tokenized_dataset,
+                    callbacks=[callback_instance]
+                )
+                self._log_debug("Successfully created Trainer instance")
+            except Exception as trainer_init_error:
+                self._log_debug(f"Error creating Trainer instance: {trainer_init_error}")
+                if self.training_callback:
+                    self.training_callback(f"Error initializing training: {trainer_init_error}", "ERROR")
+                return False
 
             # Determine if resuming from checkpoint
             resume_checkpoint_path = None
@@ -1091,16 +1142,45 @@ class LearningService:
             resume_path_for_log = resume_checkpoint_path if resume_checkpoint_path else "None (Starting Fresh)"
             self._log_debug(f"Calling trainer.train() with resume_from_checkpoint='{resume_path_for_log}'")
             
-            # Train the model, potentially resuming
-            trainer.train(resume_from_checkpoint=resume_checkpoint_path)
+            # ENHANCED ERROR HANDLING: Wrap train call in a more detailed try-except
+            try:
+                # Train the model, potentially resuming
+                trainer.train(resume_from_checkpoint=resume_checkpoint_path)
+                self._log_debug("Completed trainer.train() successfully")
+            except ValueError as ve:
+                # Common with PyInstaller - often due to file permissions or paths
+                self._log_debug(f"ValueError in trainer.train(): {ve}")
+                if "Could not locate the 'Trainer' state" in str(ve):
+                    self._log_debug("This is likely due to checkpoint path issues in PyInstaller environment")
+                if self.training_callback:
+                    self.training_callback(f"Training error: {ve}", "ERROR")
+                return False
+            except RuntimeError as re:
+                # Often CUDA or memory related
+                self._log_debug(f"RuntimeError in trainer.train(): {re}")
+                if self.training_callback:
+                    self.training_callback(f"Training error: {re}", "ERROR")
+                return False
+            except AttributeError as ae:
+                # This matches your current error - likely a None object issue
+                self._log_debug(f"AttributeError in trainer.train(): {ae}")
+                if "'NoneType' object has no attribute 'write'" in str(ae):
+                    self._log_debug("This appears to be a file writing permission issue or None stream")
+                if self.training_callback:
+                    self.training_callback(f"Training error: {ae}", "ERROR")
+                return False
+            except Exception as e:
+                # Catch-all for other errors
+                self._log_debug(f"Unexpected error in trainer.train(): {e}")
+                if self.training_callback:
+                    self.training_callback(f"Training error: {e}", "ERROR")
+                return False
 
             # Check if we stopped early
             if self.training_should_stop:
                 self._log_debug("Training was stopped by request, not saving final model")
                 # Important: Return special value to indicate graceful stop
                 return self.GRACEFUL_STOP
-
-            self._log_debug("Completed trainer.train()")
 
             # Update progress
             self.training_progress = {"status": "saving", "message": "Saving trained model"}

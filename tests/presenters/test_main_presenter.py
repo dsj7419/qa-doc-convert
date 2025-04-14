@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 from models.document import Document
 from models.paragraph import ParaRole, Paragraph
 from presenters.main_presenter import MainPresenter
+from commands.document_commands import ChangeRoleCommand
 
 class TestMainPresenter:
     """Tests for the MainPresenter class."""
@@ -97,13 +98,24 @@ class TestMainPresenter:
         """Test change_role_requested with selection."""
         # Arrange
         mock_view.get_selected_indices.return_value = {1, 2}
-        mock_document.change_paragraph_role.return_value = False
+        
+        # Replace the CommandManager with a mock to track commands
+        presenter.command_manager = MagicMock()
         
         # Act
         presenter.change_role_requested(ParaRole.QUESTION)
         
-        # Assert
-        assert mock_document.change_paragraph_role.call_count == 2
+        # Assert - With Command pattern, we check that execute was called on the CommandManager
+        presenter.command_manager.execute.assert_called_once()
+        
+        # Verify ChangeRoleCommand was created with correct arguments
+        command = presenter.command_manager.execute.call_args[0][0]
+        assert isinstance(command, ChangeRoleCommand)
+        assert command.document == mock_document
+        assert command.indices == {1, 2}
+        assert command.new_role == ParaRole.QUESTION
+        
+        # Verify UI was updated
         mock_view.display_paragraphs.assert_called_once()
     
     def test_set_expected_count_requested_valid(self, presenter, mock_view, mock_document):
