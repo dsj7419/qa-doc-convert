@@ -27,7 +27,7 @@ Name: "{localappdata}\QA_Verifier"; Permissions: users-full
 
 [Icons]
 Name: "{group}\QA Verifier Pro"; Filename: "{app}\QA Verifier Pro.exe"
-Name: "{commondesktop}\QA Verifier Pro"; Filename: "{app}\QA Verifier Pro.exe"
+Name: "{userdesktop}\QA Verifier Pro"; Filename: "{app}\QA Verifier Pro.exe"
 Name: "{group}\Uninstall QA Verifier Pro"; Filename: "{uninstallexe}"
 
 [Run]

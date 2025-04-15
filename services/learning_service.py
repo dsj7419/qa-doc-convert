@@ -461,7 +461,7 @@ class LearningService:
         # Check if there's a journal file indicating incomplete training
         if os.path.exists(self.training_journal_path):
             try:
-                with open(self.training_journal_path, 'r') as f:
+                with open(self.training_journal_path, 'r', encoding='utf-8') as f:
                     journal = json.load(f)
                 
                 self._log_debug(f"Found training journal: {journal}")
@@ -575,7 +575,7 @@ class LearningService:
                 # Read the current journal to get the existing checkpoint
                 if os.path.exists(self.training_journal_path):
                     try:
-                        with open(self.training_journal_path, 'r') as f:
+                        with open(self.training_journal_path, 'r', encoding='utf-8') as f:
                             current_journal = json.load(f)
                             if current_journal.get('last_checkpoint'):
                                 checkpoint = current_journal.get('last_checkpoint')
@@ -593,7 +593,7 @@ class LearningService:
             
             # Write to a temporary file first
             temp_path = f"{self.training_journal_path}.tmp"
-            with open(temp_path, 'w') as f:
+            with open(temp_path, 'w', encoding='utf-8') as f:
                 json.dump(journal, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())  # Ensure data is written to disk
@@ -791,7 +791,7 @@ class LearningService:
             state_path = os.path.join(checkpoint_path, "trainer_state.json")
             if os.path.exists(state_path):
                 # Read the current state
-                with open(state_path, 'r') as f:
+                with open(state_path, 'r', encoding='utf-8') as f:
                     state = json.load(f)
                 
                 self._log_debug(f"Original trainer state: {state}")
@@ -806,11 +806,11 @@ class LearningService:
                 
                 # Make a backup of the original state
                 backup_path = f"{state_path}.bak"
-                with open(backup_path, 'w') as f:
+                with open(backup_path, 'w', encoding='utf-8') as f:
                     json.dump(state, f, indent=2)
                 
                 # Write the modified state
-                with open(state_path, 'w') as f:
+                with open(state_path, 'w', encoding='utf-8') as f:
                     json.dump(state, f, indent=2)
                 
                 self._log_debug(f"Successfully modified checkpoint state to force continued training")
