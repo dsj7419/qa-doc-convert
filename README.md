@@ -2,6 +2,8 @@
 
 A professional tool for verifying and processing Q&A documents, designed to convert Word documents into CSV format for use in various educational and testing applications.
 
+![image](https://github.com/user-attachments/assets/e496d94e-a9e9-44d5-9fc3-1d93353b18b0)
+
 ## Features
 
 - **AI-Powered Analysis**: Automatically recognizes questions and answers using a transformer-based AI model with ONNX acceleration
