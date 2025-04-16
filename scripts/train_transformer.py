@@ -127,7 +127,7 @@ def train_and_export_model(data_path=None, output_dir=None, epochs=3, batch_size
     
     # Save the label map
     label_map_path = os.path.join(output_dir, "label_map.json")
-    with open(label_map_path, 'w') as f:
+    with open(label_map_path, 'w', encoding='utf-8') as f:
         json.dump(label_map, f)
     
     logger.info(f"Saved label map to {label_map_path}")

@@ -64,7 +64,7 @@ def setup_transformer_temp_dirs():
         for name, path in cache_dirs.items():
             try:
                 test_file = os.path.join(path, "test_write.tmp")
-                with open(test_file, 'w') as f:
+                with open(test_file, 'w', encoding='utf-8') as f:
                     f.write("test")
                 os.remove(test_file)
                 logger.info(f"Successfully verified {name} directory is writable")

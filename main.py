@@ -3,6 +3,7 @@
 QA Verifier - Professional Edition
 Main application entry point.
 """
+import io
 import logging
 import os
 import sys
@@ -16,6 +17,29 @@ from utils.logging_setup import setup_logging
 from utils.theme import AppTheme
 from utils.config_manager import ConfigManager
 from learning_service_fix import apply_fix
+
+# Set environment for Hugging Face and Unicode issues
+os.environ.update({
+    "PYTHONIOENCODING": "utf-8",
+    "TRANSFORMERS_VERBOSITY": "error",
+    "HF_HUB_DISABLE_SYMLINKS_WARNING": "1",
+    "HF_HUB_DISABLE_EXPERIMENTAL_WARNING": "1",
+    "TOKENIZERS_PARALLELISM": "false",
+    "HF_HUB_DOWNLOAD_TIMEOUT": "300"
+})
+
+# Patch stdout/stderr for UTF-8 if available
+if sys.stdout and hasattr(sys.stdout, "buffer"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+if sys.stderr and hasattr(sys.stderr, "buffer"):
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+# Try to apply the transformers patch early
+try:
+    from transformers_patch import apply_transformers_patch
+    apply_transformers_patch()
+except ImportError:
+    pass
 
 # Import the new PyInstaller fix
 try:

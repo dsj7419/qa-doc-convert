@@ -164,6 +164,17 @@ class LearningService:
         self._manual_training_mode = enabled
         self._log_debug(f"Manual training mode set to: {enabled}")
     
+    def _sanitize_text(self, text):
+        """Remove emoji and other problematic characters from text."""
+        if not isinstance(text, str):
+            return text
+        try:
+            # First try to encode/decode with cp1252 to filter out problematic chars
+            return text.encode('cp1252', errors='ignore').decode('cp1252')
+        except Exception as e:
+            self._log_debug(f"Error sanitizing text: {e}")
+            return str(text)
+
     def _init_resources(self) -> None:
         """Initialize resources, copying bundled files if needed."""
         self._log_debug(f"Initializing resources at {datetime.now()}")
@@ -560,15 +571,7 @@ class LearningService:
             self._log_debug(f"Error clearing training journal: {e}")
 
     def _update_training_journal(self, status, checkpoint=None, epoch=None, batch=None):
-        """
-        Update the training journal with current status.
-        
-        Args:
-            status: Current training status (starting, in_progress, completed, failed)
-            checkpoint: Path to the latest checkpoint
-            epoch: Current epoch number
-            batch: Current batch number
-        """
+        """Update the training journal with current status."""
         try:
             # Don't clear the checkpoint path if status is 'interrupted' and no checkpoint is provided
             if status == 'interrupted' and checkpoint is None:
@@ -601,9 +604,9 @@ class LearningService:
             # Then rename to the actual file
             os.replace(temp_path, self.training_journal_path)
             
-            self._log_debug(f"Updated training journal: {journal}")
+            self._log_debug(f"Updated training journal: {self._sanitize_text(str(journal))}")
         except Exception as e:
-            self._log_debug(f"Error updating training journal: {e}")
+            self._log_debug(f"Error updating training journal: {self._sanitize_text(str(e))}")
 
     def gracefully_stop_training(self):
         """
@@ -778,15 +781,7 @@ class LearningService:
             self.training_completed.set()
 
     def _modify_checkpoint_state(self, checkpoint_path):
-        """
-        Modify the trainer_state.json in a checkpoint to force continued training.
-        
-        Args:
-            checkpoint_path: Path to the checkpoint directory
-            
-        Returns:
-            bool: True if successfully modified, False otherwise
-        """
+        """Modify the trainer_state.json in a checkpoint to force continued training."""
         try:
             state_path = os.path.join(checkpoint_path, "trainer_state.json")
             if os.path.exists(state_path):
@@ -794,7 +789,7 @@ class LearningService:
                 with open(state_path, 'r', encoding='utf-8') as f:
                     state = json.load(f)
                 
-                self._log_debug(f"Original trainer state: {state}")
+                self._log_debug(f"Original trainer state: {self._sanitize_text(str(state))}")
                 
                 # Modify the epoch/steps to continue training
                 if 'epoch' in state:
@@ -819,8 +814,20 @@ class LearningService:
                 self._log_debug(f"trainer_state.json not found in checkpoint {checkpoint_path}")
                 return False
         except Exception as e:
-            self._log_debug(f"Error modifying checkpoint state: {e}")
+            error_msg = self._sanitize_text(str(e))
+            self._log_debug(f"Error modifying checkpoint state: {error_msg}")
             return False
+
+    def _sanitize_text(self, text):
+        """Remove emoji and other problematic characters from text."""
+        if not isinstance(text, str):
+            return str(text)
+        try:
+            # First try to encode/decode with cp1252 to filter out problematic chars
+            return text.encode('cp1252', errors='ignore').decode('cp1252')
+        except Exception as e:
+            self._log_debug(f"Error sanitizing text: {e}")
+            return str(text)
 
     def _train_model_internal(self, force: bool) -> bool:
         """
@@ -832,15 +839,19 @@ class LearningService:
         Returns:
             bool: Success flag or self.GRACEFUL_STOP for graceful interruptions
         """
+        os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+    
         self._log_debug(f"Training transformer model from collected data at {datetime.now()}...")
         logger.info("Training transformer model from collected data...")
 
         try:
-            # Update training progress
-            self.training_progress = {"status": "preparing", "message": "Preparing training data"}
+            # Update training progress with sanitized message
+            message = "Preparing training data"
+            sanitized_message = self._sanitize_text(message)
+            self.training_progress = {"status": "preparing", "message": sanitized_message}
             self._update_training_journal("in_progress", epoch=0, batch=0)
             if self.training_callback:
-                self.training_callback("Preparing training data", "INFO")
+                self.training_callback(sanitized_message, "INFO")
 
             # Debug info: log current directory and environment variables 
             self._log_debug(f"Current working directory: {os.getcwd()}")
@@ -860,12 +871,13 @@ class LearningService:
                     os.makedirs(directory, exist_ok=True)
                     # Test write access
                     test_file = os.path.join(directory, "test_write.tmp")
-                    with open(test_file, 'w') as f:
+                    with open(test_file, 'w', encoding='utf-8') as f:  # Added UTF-8 encoding
                         f.write("test")
                     os.remove(test_file)
                     self._log_debug(f"Directory verified writable: {directory}")
                 except Exception as e:
-                    self._log_debug(f"CRITICAL ERROR: Directory not writable: {directory}, error: {e}")
+                    error_msg = self._sanitize_text(str(e))
+                    self._log_debug(f"CRITICAL ERROR: Directory not writable: {directory}, error: {error_msg}")
                     if self.training_callback:
                         self.training_callback(f"Error with directory permissions: {directory}", "ERROR")
                     return False
@@ -876,7 +888,9 @@ class LearningService:
 
             for role, examples in self.training_data.items():
                 for example in examples:
-                    texts.append(example['text'])
+                    # Sanitize text to avoid emoji issues
+                    sanitized_text = self._sanitize_text(example['text'])
+                    texts.append(sanitized_text)
                     labels.append(role)
 
             self._log_debug(f"Prepared {len(texts)} examples for training")
@@ -886,8 +900,10 @@ class LearningService:
                 self._log_debug("Training stopped by request during data preparation")
                 return self.GRACEFUL_STOP
 
-            # Update progress
-            self.training_progress = {"status": "tokenizing", "message": "Tokenizing data"}
+            # Update progress with sanitized message
+            message = "Tokenizing data"
+            sanitized_message = self._sanitize_text(message)
+            self.training_progress = {"status": "tokenizing", "message": sanitized_message}
             if self.training_callback:
                 self.training_callback("Tokenizing training data", "INFO")
 
@@ -925,8 +941,10 @@ class LearningService:
                 self._log_debug("Training stopped by request after tokenization")
                 return self.GRACEFUL_STOP
 
-            # Update progress
-            self.training_progress = {"status": "training", "message": "Training model"}
+            # Update progress with sanitized message
+            message = "Training model"
+            sanitized_message = self._sanitize_text(message)
+            self.training_progress = {"status": "training", "message": sanitized_message}
             if self.training_callback:
                 self.training_callback("Training model", "INFO")
 
@@ -965,7 +983,8 @@ class LearningService:
                                     continue
                     
                     if latest_checkpoint:
-                        self.outer._log_debug(f"Found latest checkpoint: {latest_checkpoint} (step {latest_step})")
+                        log_msg = f"Found latest checkpoint: {latest_checkpoint} (step {latest_step})"
+                        self.outer._log_debug(self.outer._sanitize_text(log_msg))
                     else:
                         self.outer._log_debug(f"No checkpoints found in {output_dir}")
                         
@@ -984,8 +1003,9 @@ class LearningService:
                         self.last_checkpoint_path = latest_checkpoint
                         self.last_saved_step = state.global_step
                         
-                        # Log the checkpoint save
-                        self.outer._log_debug(f"Checkpoint saved at step {state.global_step}. Path: {latest_checkpoint}")
+                        # Log the checkpoint save with sanitized message
+                        log_msg = f"Checkpoint saved at step {state.global_step}. Path: {latest_checkpoint}"
+                        self.outer._log_debug(self.outer._sanitize_text(log_msg))
                         
                         # Update the training journal with this checkpoint path
                         self.outer._update_training_journal(
@@ -995,26 +1015,33 @@ class LearningService:
                             batch=state.global_step
                         )
                     else:
-                        self.outer._log_debug(f"on_save called at step {state.global_step}, but couldn't find checkpoint directory.")
+                        log_msg = f"on_save called at step {state.global_step}, but couldn't find checkpoint directory."
+                        self.outer._log_debug(self.outer._sanitize_text(log_msg))
                     
                     return control
 
                 def on_epoch_end(self, args, state, control, **kwargs):
                     """Called at the end of an epoch."""
-                    self.outer._log_debug(f"Epoch {state.epoch:.1f} completed. Step {state.global_step}")
+                    log_msg = f"Epoch {state.epoch:.1f} completed. Step {state.global_step}"
+                    self.outer._log_debug(self.outer._sanitize_text(log_msg))
                     
+                    # Sanitize message for training progress
+                    progress_msg = f"Epoch {state.epoch:.1f} completed. Step {state.global_step}"
+                    sanitized_msg = self.outer._sanitize_text(progress_msg)
                     self.outer.training_progress = {
                         "status": "training",
-                        "message": f"Epoch {state.epoch:.1f} completed. Step {state.global_step}"
+                        "message": sanitized_msg
                     }
                     
                     # Check for stop request
                     if self.outer.training_should_stop:
-                        self.outer._log_debug(f"Stop request detected at end of epoch {state.epoch}")
+                        log_msg = f"Stop request detected at end of epoch {state.epoch}"
+                        self.outer._log_debug(self.outer._sanitize_text(log_msg))
                         
                         # Make sure we update the journal with the latest checkpoint path before stopping
                         if self.last_checkpoint_path:
-                            self.outer._log_debug(f"Ensuring latest checkpoint path is saved to journal: {self.last_checkpoint_path}")
+                            log_msg = f"Ensuring latest checkpoint path is saved to journal: {self.last_checkpoint_path}"
+                            self.outer._log_debug(self.outer._sanitize_text(log_msg))
                             self.outer._update_training_journal(
                                 "interrupted",
                                 checkpoint=self.last_checkpoint_path,
@@ -1031,18 +1058,23 @@ class LearningService:
                     """Called at the end of a training step."""
                     # Periodically update progress (not too frequently)
                     if state.global_step % 10 == 0:
+                        # Sanitize message for training progress
+                        progress_msg = f"Training in progress - Epoch {state.epoch:.1f}, Step {state.global_step}"
+                        sanitized_msg = self.outer._sanitize_text(progress_msg)
                         self.outer.training_progress = {
                             "status": "training",
-                            "message": f"Training in progress - Epoch {state.epoch:.1f}, Step {state.global_step}"
+                            "message": sanitized_msg
                         }
 
                     # Check for stop request
                     if self.outer.training_should_stop:
-                        self.outer._log_debug(f"Stop request detected at step {state.global_step}")
+                        log_msg = f"Stop request detected at step {state.global_step}"
+                        self.outer._log_debug(self.outer._sanitize_text(log_msg))
                         
                         # Make sure we update the journal with the latest checkpoint path before stopping
                         if self.last_checkpoint_path:
-                            self.outer._log_debug(f"Ensuring latest checkpoint path is saved to journal: {self.last_checkpoint_path}")
+                            log_msg = f"Ensuring latest checkpoint path is saved to journal: {self.last_checkpoint_path}"
+                            self.outer._log_debug(self.outer._sanitize_text(log_msg))
                             self.outer._update_training_journal(
                                 "interrupted",
                                 checkpoint=self.last_checkpoint_path,
@@ -1084,8 +1116,9 @@ class LearningService:
                 no_cuda=not torch.cuda.is_available(),
             )
             
-            # Log the training arguments
-            self._log_debug(f"Training arguments: {training_args}")
+            # Log the training arguments with sanitization
+            args_str = self._sanitize_text(str(training_args))
+            self._log_debug(f"Training arguments: {args_str}")
 
             # Create Trainer with our stoppable callback
             callback_instance = StoppableCheckpointCallback(self)
@@ -1100,9 +1133,10 @@ class LearningService:
                 )
                 self._log_debug("Successfully created Trainer instance")
             except Exception as trainer_init_error:
-                self._log_debug(f"Error creating Trainer instance: {trainer_init_error}")
+                error_msg = self._sanitize_text(str(trainer_init_error))
+                self._log_debug(f"Error creating Trainer instance: {error_msg}")
                 if self.training_callback:
-                    self.training_callback(f"Error initializing training: {trainer_init_error}", "ERROR")
+                    self.training_callback(f"Error initializing training: {error_msg}", "ERROR")
                 return False
 
             # Determine if resuming from checkpoint
@@ -1149,31 +1183,35 @@ class LearningService:
                 self._log_debug("Completed trainer.train() successfully")
             except ValueError as ve:
                 # Common with PyInstaller - often due to file permissions or paths
-                self._log_debug(f"ValueError in trainer.train(): {ve}")
+                error_msg = self._sanitize_text(str(ve))
+                self._log_debug(f"ValueError in trainer.train(): {error_msg}")
                 if "Could not locate the 'Trainer' state" in str(ve):
                     self._log_debug("This is likely due to checkpoint path issues in PyInstaller environment")
                 if self.training_callback:
-                    self.training_callback(f"Training error: {ve}", "ERROR")
+                    self.training_callback(f"Training error: {error_msg}", "ERROR")
                 return False
             except RuntimeError as re:
                 # Often CUDA or memory related
-                self._log_debug(f"RuntimeError in trainer.train(): {re}")
+                error_msg = self._sanitize_text(str(re))
+                self._log_debug(f"RuntimeError in trainer.train(): {error_msg}")
                 if self.training_callback:
-                    self.training_callback(f"Training error: {re}", "ERROR")
+                    self.training_callback(f"Training error: {error_msg}", "ERROR")
                 return False
             except AttributeError as ae:
                 # This matches your current error - likely a None object issue
-                self._log_debug(f"AttributeError in trainer.train(): {ae}")
+                error_msg = self._sanitize_text(str(ae))
+                self._log_debug(f"AttributeError in trainer.train(): {error_msg}")
                 if "'NoneType' object has no attribute 'write'" in str(ae):
                     self._log_debug("This appears to be a file writing permission issue or None stream")
                 if self.training_callback:
-                    self.training_callback(f"Training error: {ae}", "ERROR")
+                    self.training_callback(f"Training error: {error_msg}", "ERROR")
                 return False
             except Exception as e:
                 # Catch-all for other errors
-                self._log_debug(f"Unexpected error in trainer.train(): {e}")
+                error_msg = self._sanitize_text(str(e))
+                self._log_debug(f"Unexpected error in trainer.train(): {error_msg}")
                 if self.training_callback:
-                    self.training_callback(f"Training error: {e}", "ERROR")
+                    self.training_callback(f"Training error: {error_msg}", "ERROR")
                 return False
 
             # Check if we stopped early
@@ -1182,8 +1220,10 @@ class LearningService:
                 # Important: Return special value to indicate graceful stop
                 return self.GRACEFUL_STOP
 
-            # Update progress
-            self.training_progress = {"status": "saving", "message": "Saving trained model"}
+            # Update progress with sanitized message
+            message = "Saving trained model"
+            sanitized_message = self._sanitize_text(message)
+            self.training_progress = {"status": "saving", "message": sanitized_message}
             if self.training_callback:
                 self.training_callback("Saving trained model", "INFO")
 
@@ -1195,8 +1235,8 @@ class LearningService:
             trainer.save_model(self.fine_tuned_model_dir)
             tokenizer.save_pretrained(self.fine_tuned_model_dir)
 
-            # Save the label map
-            with open(self.label_map_path, 'w') as f:
+            # Save the label map with UTF-8 encoding
+            with open(self.label_map_path, 'w', encoding='utf-8') as f:
                 json.dump(inverse_label_map, f)
 
             self._log_debug(f"Saved label map to {self.label_map_path}")
@@ -1210,7 +1250,9 @@ class LearningService:
             # Export to ONNX if available
             if ONNX_AVAILABLE:
                 self._log_debug("ONNX is available, starting export")
-                self.training_progress = {"status": "exporting", "message": "Exporting to ONNX format"}
+                message = "Exporting to ONNX format"
+                sanitized_message = self._sanitize_text(message)
+                self.training_progress = {"status": "exporting", "message": sanitized_message}
                 if self.training_callback:
                     self.training_callback("Exporting to ONNX format", "INFO")
 
@@ -1238,22 +1280,25 @@ class LearningService:
                         pickle.dump("PLACEHOLDER - Using Transformer Model", f)
                     self._log_debug(f"Replaced legacy model with placeholder")
                 except Exception as e:
-                    self._log_debug(f"Error replacing legacy model: {e}")
+                    error_msg = self._sanitize_text(str(e))
+                    self._log_debug(f"Error replacing legacy model: {error_msg}")
             
             if os.path.exists(self.legacy_vocab_path):
                 try:
                     os.remove(self.legacy_vocab_path)
                     self._log_debug(f"Removed legacy vocabulary file")
                 except Exception as e:
-                    self._log_debug(f"Error removing legacy vocabulary file: {e}")
+                    error_msg = self._sanitize_text(str(e))
+                    self._log_debug(f"Error removing legacy vocabulary file: {error_msg}")
             
             self._log_debug(f"Successfully trained and saved transformer model with {len(texts)} examples")
             logger.info(f"Successfully trained and saved transformer model with {len(texts)} examples")
             return True
             
         except Exception as e:
-            self._log_debug(f"Error training transformer model: {e}")
-            logger.error(f"Error training transformer model: {e}", exc_info=True)
+            error_msg = self._sanitize_text(str(e))
+            self._log_debug(f"Error training transformer model: {error_msg}")
+            logger.error(f"Error training transformer model: {error_msg}", exc_info=True)
             self._update_training_journal("failed")
             return False
     

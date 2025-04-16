@@ -48,7 +48,7 @@ def verify_directory(directory_path):
         
         # Test write permissions
         test_file = os.path.join(directory_path, "test_write.tmp")
-        with open(test_file, 'w') as f:
+        with open(test_file, 'w', encoding='utf-8') as f:
             f.write("test")
         os.remove(test_file)
         

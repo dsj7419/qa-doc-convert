@@ -138,7 +138,7 @@ class AIAnalyzer(BaseAnalyzer):
             # Load the label map
             try:
                 if os.path.exists(self.label_map_path):
-                    with open(self.label_map_path, 'r') as f:
+                    with open(self.label_map_path, 'r', encoding='utf-8') as f:
                         self.label_map = json.load(f)
                     self.logger.info(f"Successfully loaded label map: {self.label_map}")
                     
